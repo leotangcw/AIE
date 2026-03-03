@@ -241,11 +241,11 @@ async function fetchInfo() {
 async function handleLogout() {
   try {
     await authAPI.logout()
-    localStorage.removeItem('CountBot_token')
+    localStorage.removeItem('AIE_token')
     window.location.href = '/login'
   } catch {
     // 即使请求失败也清除本地 token 并跳转
-    localStorage.removeItem('CountBot_token')
+    localStorage.removeItem('AIE_token')
     window.location.href = '/login'
   }
 }

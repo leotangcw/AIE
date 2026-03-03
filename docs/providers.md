@@ -1,6 +1,6 @@
 # LLM 提供商 (Providers)
 
-> CountBot 的 LLM 提供商子系统，通过 LiteLLM 统一接口支持多种大语言模型。
+> AIE 的 LLM 提供商子系统，通过 LiteLLM 统一接口支持多种大语言模型。
 
 ## 目录
 
@@ -206,7 +206,7 @@ _format_error_message(raw_error)
 
 ## 流式接口
 
-CountBot 只使用流式接口（`chat_stream`），不提供同步的 `generate()` 方法。
+AIE 只使用流式接口（`chat_stream`），不提供同步的 `generate()` 方法。
 
 ### 消费方式
 

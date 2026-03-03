@@ -1,6 +1,6 @@
 # API 参考 (API Reference)
 
-> CountBot 完整的 REST API 和 WebSocket 接口参考文档。
+> AIE 完整的 REST API 和 WebSocket 接口参考文档。
 
 ## 基础信息
 
@@ -18,7 +18,7 @@
 
 ### 认证方式
 
-- **Cookie**: `CountBot_token=<token>`
+- **Cookie**: `AIE_token=<token>`
 - **Header**: `Authorization: Bearer <token>`
 - **WebSocket**: `ws://host/ws/chat?token=<token>`
 
@@ -711,7 +711,7 @@
 const ws = new WebSocket("ws://localhost:8000/ws/chat")
 
 // 远程访问（需要认证 token）
-const token = localStorage.getItem('CountBot_token')
+const token = localStorage.getItem('AIE_token')
 const ws = new WebSocket(`ws://192.168.x.x:8000/ws/chat?token=${token}`)
 ```
 

@@ -8,7 +8,7 @@
       <div class="sidebar-panel">
         <div class="sidebar-header">
           <div class="sidebar-brand">
-            <img src="@/assets/countbot-logo.svg" alt="AIE Logo" class="sidebar-logo" />
+            <img src="@/assets/aie-logo.svg" alt="AIE Logo" class="sidebar-logo" />
             <h2 class="sidebar-title">{{ $t('sidebar.title') }}</h2>
           </div>
           <button
@@ -107,7 +107,7 @@
             </div>
             <div class="project-links">
               <a
-                href="https://github.com/countbot-ai/countbot"
+                href="https://github.com/leotangcw/AIE"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="project-link"
@@ -115,7 +115,7 @@
                 <component :is="GithubIcon" :size="18" />
                 <div class="project-link-content">
                   <span class="project-link-title">GitHub</span>
-                  <span class="project-link-desc">countbot-ai/AIE</span>
+                  <span class="project-link-desc">leotangcw/AIE</span>
                 </div>
                 <component :is="ExternalLinkIcon" :size="14" class="external-icon" />
               </a>

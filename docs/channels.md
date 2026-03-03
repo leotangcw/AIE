@@ -1,6 +1,6 @@
 # 多渠道系统 (Channels)
 
-> CountBot 的多渠道消息接入系统，支持同时接入 Telegram、钉钉、飞书、QQ、微信等即时通讯平台。
+> AIE 的多渠道消息接入系统，支持同时接入 Telegram、钉钉、飞书、QQ、微信等即时通讯平台。
 
 ## 目录
 
@@ -425,7 +425,7 @@ rate_limiter = RateLimiter(rate=10, per=60)
 
 ### 远程访问认证与渠道的关系
 
-CountBot 的远程访问认证模块（`RemoteAuthMiddleware`）仅拦截 HTTP `/api/*` 和 `/ws/*` 路径。所有渠道（Telegram、钉钉、飞书、QQ、微信）均使用主动连接模式（长轮询或 WebSocket Stream），由后端主动连接到平台服务器，不经过 HTTP 中间件，因此完全不受远程认证影响。
+AIE 的远程访问认证模块（`RemoteAuthMiddleware`）仅拦截 HTTP `/api/*` 和 `/ws/*` 路径。所有渠道（Telegram、钉钉、飞书、QQ、微信）均使用主动连接模式（长轮询或 WebSocket Stream），由后端主动连接到平台服务器，不经过 HTTP 中间件，因此完全不受远程认证影响。
 
 即使启用了远程访问密码保护，渠道消息的收发也不会受到任何干扰。
 

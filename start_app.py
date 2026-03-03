@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CountBot 应用启动脚本
+AIE 应用启动脚本
 生产模式启动，自动打开浏览器
 支持本地网络 IP 监控，类似 Vue3 启动模式
 """
@@ -65,7 +65,7 @@ def main() -> None:
     
     # 打印启动信息
     logger.info("=" * 60)
-    logger.info("CountBot 启动中...")
+    logger.info("AIE 启动中...")
     logger.info("=" * 60)
     
     try:

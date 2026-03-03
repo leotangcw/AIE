@@ -4,12 +4,12 @@
       <!-- Logo area -->
       <div class="login-brand">
         <div class="brand-icon">
-          <img src="@/assets/countbot-logo.svg" alt="AIE Logo" />
+          <img src="@/assets/aie-logo.svg" alt="AIE Logo" />
         </div>
         <h1 class="brand-name">
-          <span class="brand-count">Count</span><span class="brand-bot">Bot</span>
+          <span class="brand-ai">AI</span><span class="brand-e">E</span>
         </h1>
-        <p class="brand-tagline">654321, AI Delivers</p>
+        <p class="brand-tagline">AI Employee, Your Smart Assistant</p>
       </div>
 
       <!-- Mode hint -->

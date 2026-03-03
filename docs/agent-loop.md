@@ -1,6 +1,6 @@
 # Agent Loop
 
-> CountBot 的核心推理引擎，实现完整的 ReAct（Reasoning + Acting）循环，驱动 LLM 推理、工具调用和结果反馈。
+> AIE 的核心推理引擎，实现完整的 ReAct（Reasoning + Acting）循环，驱动 LLM 推理、工具调用和结果反馈。
 
 ## 目录
 

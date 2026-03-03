@@ -1,6 +1,6 @@
 # 远程访问认证 (Remote Access Authentication)
 
-> CountBot 内置远程访问认证模块，当通过非本地 IP 访问时自动触发认证保护，防止未授权的远程访问。
+> AIE 内置远程访问认证模块，当通过非本地 IP 访问时自动触发认证保护，防止未授权的远程访问。
 
 ## 目录
 
@@ -219,14 +219,14 @@
 
 - 使用 `secrets.token_urlsafe(32)` 生成
 - 内存存储，24 小时过期
-- 支持通过 Cookie（`CountBot_token`）或 Authorization Header（`Bearer xxx`）传递
+- 支持通过 Cookie（`AIE_token`）或 Authorization Header（`Bearer xxx`）传递
 - 应用重启后所有 session 失效（需重新登录）
 
 ## 前端集成
 
 ### Token 管理
 
-- 登录成功后 token 保存到 `localStorage.CountBot_token`
+- 登录成功后 token 保存到 `localStorage.AIE_token`
 - axios 请求拦截器自动附带 `Authorization: Bearer {token}`
 - 响应拦截器捕获 401 + `AUTH_REQUIRED`/`AUTH_SETUP_REQUIRED` → 跳转 `/login`
 

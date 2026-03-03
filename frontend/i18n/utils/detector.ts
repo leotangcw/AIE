@@ -90,7 +90,7 @@ export function normalizeLocale(locale: string): SupportedLocale {
  * 从存储中获取语言设置
  */
 export function getStoredLocale(): SupportedLocale | null {
-    const stored = localStorage.getItem('CountBot-language')
+    const stored = localStorage.getItem('AIE-language')
     if (stored && isSupportedLocale(stored)) {
         return stored
     }
@@ -101,14 +101,14 @@ export function getStoredLocale(): SupportedLocale | null {
  * 保存语言设置到存储
  */
 export function setStoredLocale(locale: SupportedLocale): void {
-    localStorage.setItem('CountBot-language', locale)
+    localStorage.setItem('AIE-language', locale)
 }
 
 /**
  * 从存储中获取主题设置
  */
 export function getStoredTheme(): Theme | null {
-    const stored = localStorage.getItem('CountBot-theme')
+    const stored = localStorage.getItem('AIE-theme')
     if (stored === 'light' || stored === 'dark' || stored === 'auto') {
         return stored
     }
@@ -119,7 +119,7 @@ export function getStoredTheme(): Theme | null {
  * 保存主题设置到存储
  */
 export function setStoredTheme(theme: Theme): void {
-    localStorage.setItem('CountBot-theme', theme)
+    localStorage.setItem('AIE-theme', theme)
 }
 
 /**

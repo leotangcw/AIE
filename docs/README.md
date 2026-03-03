@@ -1,12 +1,12 @@
-# CountBot 文档中心
+# AIE 文档中心
 
-欢迎来到 CountBot 文档中心，这里提供完整的技术文档、开发指南和最佳实践。
+欢迎来到 AIE 文档中心，这里提供完整的技术文档、开发指南和最佳实践。
 
 ## 文档导航
 
 ### 快速开始
 
-- [快速开始指南](quick-start-guide.md) - 5分钟上手 CountBot
+- [快速开始指南](quick-start-guide.md) - 5分钟上手 AIE
 - [部署与运维](deployment.md) - 安装、启动、生产部署指南
 
 ### 核心概念

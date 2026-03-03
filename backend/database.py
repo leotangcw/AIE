@@ -10,7 +10,7 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from backend.utils.paths import DATA_DIR
 
 # 数据库文件路径
-DATABASE_PATH = DATA_DIR / "countbot.db"
+DATABASE_PATH = DATA_DIR / "aie.db"
 DATABASE_URL = f"sqlite+aiosqlite:///{DATABASE_PATH}"
 SYNC_DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 

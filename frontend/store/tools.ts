@@ -23,7 +23,7 @@ export interface ToolExecution {
     duration: number | null
 }
 
-const STORAGE_KEY = 'CountBot_tool_history'
+const STORAGE_KEY = 'AIE_tool_history'
 const MAX_HISTORY_SIZE = 100 // 最多保存 100 条记录
 
 // 从 localStorage 加载历史记录

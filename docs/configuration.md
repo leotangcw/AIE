@@ -1,6 +1,6 @@
 # 配置系统 (Configuration)
 
-> CountBot 的配置管理系统，基于数据库持久化，支持热更新、API 密钥加密和性格预设。
+> AIE 的配置管理系统，基于数据库持久化，支持热更新、API 密钥加密和性格预设。
 
 ## 目录
 
@@ -237,7 +237,7 @@ class PersonaConfig(BaseModel):
 
 **文件**: `backend/modules/agent/personalities.py`
 
-CountBot 提供 12 种性格预设：
+AIE 提供 12 种性格预设：
 
 | ID | 名称 | 特点 |
 |----|------|------|
