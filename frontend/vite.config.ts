@@ -29,7 +29,7 @@ export default defineConfig({
     },
 
     server: {
-        port: 5174,  // AIE 前端端口，避免与 CountBot 的 5173 冲突
+        port: 5174,  // AIE 前端端口
         strictPort: false,
         host: '127.0.0.1',
         cors: true,

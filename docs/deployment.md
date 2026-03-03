@@ -1,6 +1,6 @@
 # 部署与运维 (Deployment)
 
-> CountBot 的安装、启动、部署和运维指南。
+> AIE 的安装、启动、部署和运维指南。
 
 ## 目录
 
@@ -39,7 +39,7 @@
 ```bash
 # 克隆仓库
 git clone https://github.com/countbot-ai/countbot.git
-cd CountBot
+cd AIE
 
 # 安装 Python 依赖
 pip install -r requirements.txt
@@ -60,7 +60,7 @@ loguru==0.7.2             # 日志
 ### 桌面运行环境
 
 ```
-pywebview           # 桌面容器 CountBot Desktop
+pywebview           # 桌面容器 AIE Desktop
 ```
 
 ### 渠道 SDK（可选）
@@ -109,7 +109,7 @@ npm run dev
 
 ### 桌面模式（pywebview）
 
-CountBot 支持通过 pywebview 以原生桌面窗口运行，无需浏览器：
+AIE 支持通过 pywebview 以原生桌面窗口运行，无需浏览器：
 
 ```bash
 # 安装 pywebview 依赖（已包含在 requirements.txt）
@@ -247,11 +247,11 @@ cp memory/MEMORY.md memory/MEMORY.md.bak
 
 **文件**: `backend/utils/ssl_compat.py`
 
-CountBot 在启动时自动处理 SSL 证书问题：
+AIE 在启动时自动处理 SSL 证书问题：
 
 ### macOS
 
-Python 在 macOS 上默认不使用系统 SSL 证书，导致 HTTPS 请求失败。CountBot 通过 `certifi` 包自动配置：
+Python 在 macOS 上默认不使用系统 SSL 证书，导致 HTTPS 请求失败。AIE 通过 `certifi` 包自动配置：
 
 ```python
 import certifi
@@ -277,7 +277,7 @@ pip install certifi
 
 ### 远程访问认证
 
-当通过非本地 IP 访问 CountBot 时（如局域网 `192.168.x.x` 或公网 IP），系统自动启用认证保护：
+当通过非本地 IP 访问 AIE 时（如局域网 `192.168.x.x` 或公网 IP），系统自动启用认证保护：
 
 - 首次远程访问时引导设置管理员账号密码
 - 密码要求：至少 8 位，包含大写字母、小写字母和数字
@@ -290,16 +290,16 @@ pip install certifi
 ### 使用 systemd（Linux）
 
 ```ini
-# /etc/systemd/system/CountBot.service
+# /etc/systemd/system/AIE.service
 [Unit]
-Description=CountBot AI Assistant
+Description=AIE AI Assistant
 After=network.target
 
 [Service]
 Type=simple
-User=CountBot
-WorkingDirectory=/opt/CountBot
-ExecStart=/opt/CountBot/venv/bin/python start_app.py
+User=AIE
+WorkingDirectory=/opt/AIE
+ExecStart=/opt/AIE/venv/bin/python start_app.py
 Restart=always
 RestartSec=5
 Environment=PORT=8000
@@ -309,8 +309,8 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-sudo systemctl enable CountBot
-sudo systemctl start CountBot
+sudo systemctl enable AIE
+sudo systemctl start AIE
 ```
 
 ### 使用 Docker
@@ -332,8 +332,8 @@ CMD ["python", "start_app.py"]
 ```
 
 ```bash
-docker build -t CountBot .
-docker run -d -p 8000:8000 -v ./data:/app/data CountBot
+docker build -t AIE .
+docker run -d -p 8000:8000 -v ./data:/app/data AIE
 ```
 
 ### 反向代理（Nginx）
@@ -341,7 +341,7 @@ docker run -d -p 8000:8000 -v ./data:/app/data CountBot
 ```nginx
 server {
     listen 80;
-    server_name CountBot.example.com;
+    server_name AIE.example.com;
 
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -357,14 +357,14 @@ server {
 
 注意 WebSocket 需要 `Upgrade` 和 `Connection` 头。
 
-> **认证注意**：如果使用 Nginx 反向代理，CountBot 的认证中间件会检测 `X-Forwarded-For` 头。当存在此头时，即使 `client.host` 是 `127.0.0.1`，也不会被视为本地请求，需要正常认证。这是为了防止通过代理绕过认证。
+> **认证注意**：如果使用 Nginx 反向代理，AIE 的认证中间件会检测 `X-Forwarded-For` 头。当存在此头时，即使 `client.host` 是 `127.0.0.1`，也不会被视为本地请求，需要正常认证。这是为了防止通过代理绕过认证。
 
 ## 目录结构
 
 运行时目录：
 
 ```
-CountBot/
+AIE/
 ├── data/                  # 运行时数据（自动创建）
 │   ├── countbot.db         # SQLite 数据库
 │   └── audit_logs/        # 审计日志
@@ -378,7 +378,7 @@ CountBot/
 
 ## 日志
 
-CountBot 使用 `loguru` 记录日志，输出到 stderr。
+AIE 使用 `loguru` 记录日志，输出到 stderr。
 
 ### 日志级别
 
@@ -438,7 +438,7 @@ PORT=9000 python start_app.py
 sqlite3.OperationalError: database is locked
 ```
 
-SQLite 不支持高并发写入。确保只有一个 CountBot 实例在运行。
+SQLite 不支持高并发写入。确保只有一个 AIE 实例在运行。
 
 ### LLM API 错误
 

@@ -14,7 +14,7 @@ import {
     getEffectiveTheme
 } from '@/i18n/utils/detector'
 
-const THEME_KEY = 'CountBot-theme'
+const THEME_KEY = 'AIE-theme'
 const currentTheme = ref<'light' | 'dark'>('light')
 const themeMode = ref<Theme>('auto')
 

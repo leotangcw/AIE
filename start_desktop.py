@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CountBot Desktop 启动入口"""
+"""AIE Desktop 启动入口"""
 
 import os
 import sys
@@ -83,8 +83,8 @@ def check_dependencies() -> tuple[bool, str]:
 
 def get_icon_path() -> str | None:
     """获取图标路径"""
-    name_map = {"Windows": "countbot.ico", "Darwin": "countbot.icns"}
-    icon = RESOURCES_DIR / name_map.get(platform.system(), "countbot.png")
+    name_map = {"Windows": "aie.ico", "Darwin": "aie.icns"}
+    icon = RESOURCES_DIR / name_map.get(platform.system(), "aie.png")
     return str(icon) if icon.exists() else None
 
 
@@ -103,7 +103,7 @@ def _set_windows_app_id() -> None:
     """设置 Windows 任务栏图标"""
     try:
         import ctypes
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("countbot.desktop.app")
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("aie.desktop.app")
     except Exception:
         pass
 
@@ -186,7 +186,7 @@ def main():
     port = int(os.getenv("PORT", "8000"))
     os.environ["HOST"] = host
 
-    logger.info(f"CountBot Desktop 启动中 http://{host}:{port}")
+    logger.info(f"AIE Desktop 启动中 http://{host}:{port}")
     
     frontend_ok, frontend_msg = _check_frontend()
     if not frontend_ok:
@@ -217,7 +217,7 @@ def main():
     try:
         logger.info("创建应用窗口...")
         window = webview.create_window(
-            title="CountBot Desktop",
+            title="AIE Desktop",
             url=f"http://{host}:{port}",
             width=960,
             height=680,
@@ -231,7 +231,7 @@ def main():
         if icon_path:
             start_kwargs["icon"] = icon_path
         
-        logger.info("CountBot Desktop 启动成功")
+        logger.info("AIE Desktop 启动成功")
         webview.start(**start_kwargs)
         
     except Exception as e:
@@ -240,7 +240,7 @@ def main():
         show_error_dialog("窗口创建失败", msg)
         sys.exit(1)
 
-    logger.info("CountBot Desktop 已退出")
+    logger.info("AIE Desktop 已退出")
     os._exit(0)
 
 

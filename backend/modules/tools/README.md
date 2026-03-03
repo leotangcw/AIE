@@ -2,7 +2,7 @@
 
 ## 概述
 
-工具模块为 CountBot Desktop 提供了完整的工具系统，允许 AI Agent 执行各种操作，包括文件操作、Shell 命令执行和 Web 搜索。
+工具模块为 AIE 提供了完整的工具系统，允许 AI Agent 执行各种操作，包括文件操作、Shell 命令执行和 Web 搜索。
 
 ## 架构
 
@@ -291,7 +291,7 @@ class CustomTool(Tool):
 
 查看日志：
 ```bash
-tail -f data/logs/CountBot_*.log
+tail -f data/logs/AIE_*.log
 ```
 
 ## 依赖

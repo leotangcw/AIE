@@ -53,8 +53,8 @@
         "disable": "禁用"
     },
     "app": {
-        "title": "CountBot",
-        "welcome": "CountBot - 654321，AI 即可达成",
+        "title": "AIE",
+        "welcome": "AIE - 654321，AI 即可达成",
         "status": "状态",
         "connected": "已连接",
         "disconnected": "未连接",
@@ -608,7 +608,7 @@
                 "taskComplete": "后台任务完成时通知",
                 "cronJob": "定时任务运行时通知",
                 "test": "测试通知",
-                "testMessage": "这是来自 CountBot 的测试通知！",
+                "testMessage": "这是来自 AIE 的测试通知！",
                 "testSent": "测试通知已发送",
                 "testError": "发送测试通知失败"
             }

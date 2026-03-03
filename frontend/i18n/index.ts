@@ -39,6 +39,6 @@ export const locale = i18n.global.locale
  */
 export function setLocale(newLocale: 'zh-CN' | 'en-US') {
     i18n.global.locale.value = newLocale
-    localStorage.setItem('CountBot-language', newLocale)
+    localStorage.setItem('AIE-language', newLocale)
     document.documentElement.setAttribute('lang', newLocale)
 }

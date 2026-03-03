@@ -405,7 +405,7 @@ const handleSetupPassword = async () => {
   try {
     const result = await authAPI.setup({ username: setupUsername.value.trim(), password: setupPassword.value })
     if (result.success && result.token) {
-      localStorage.setItem('CountBot_token', result.token)
+      localStorage.setItem('AIE_token', result.token)
     }
     showPasswordSetup.value = false
     securityWarningDismissed.value = true

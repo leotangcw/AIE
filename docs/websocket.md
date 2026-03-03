@@ -1,6 +1,6 @@
 # WebSocket 实时通信
 
-> CountBot 的 WebSocket 子系统，提供实时流式响应、工具执行通知和任务状态推送。
+> AIE 的 WebSocket 子系统，提供实时流式响应、工具执行通知和任务状态推送。
 
 ## 目录
 
@@ -396,7 +396,7 @@ WebSocket 连接同样受远程访问认证保护。本地访问（`127.0.0.1` /
 ws://192.168.x.x:8000/ws/chat?token=YOUR_SESSION_TOKEN
 ```
 
-也支持通过 Cookie（`CountBot_token`）传递。
+也支持通过 Cookie（`AIE_token`）传递。
 
 ### 认证失败处理
 

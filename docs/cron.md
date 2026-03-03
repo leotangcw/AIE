@@ -1,6 +1,6 @@
 # 定时任务系统 (Cron)
 
-> CountBot 的定时任务调度系统，支持 Cron 表达式调度、Agent 执行、渠道投递。
+> AIE 的定时任务调度系统，支持 Cron 表达式调度、Agent 执行、渠道投递。
 
 ## 目录
 
@@ -331,7 +331,7 @@ job = await service.add_job(
 
 ### 通过聊天管理定时任务
 
-CountBot 提供 `cron-manager` 技能，用户可以通过自然语言对话创建和管理定时任务。AI 会调用 `skills/cron-manager/scripts/cron_manager.py` 脚本执行操作。
+AIE 提供 `cron-manager` 技能，用户可以通过自然语言对话创建和管理定时任务。AI 会调用 `skills/cron-manager/scripts/cron_manager.py` 脚本执行操作。
 
 示例对话：
 - "帮我设置一个每天早上9点查天气的任务" -> AI 调用 create 命令
@@ -434,7 +434,7 @@ Cron 系统在应用启动时自动初始化，无需额外配置。任务通过
 
 ## 内置 Heartbeat 问候任务
 
-CountBot 内置了一个 Heartbeat 主动问候任务，通过复用 Cron 系统实现定时检查和自动问候。
+AIE 内置了一个 Heartbeat 主动问候任务，通过复用 Cron 系统实现定时检查和自动问候。
 
 ### 工作原理
 

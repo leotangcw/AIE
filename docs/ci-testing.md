@@ -241,4 +241,4 @@ git config --global --unset http.proxy
 
 ---
 
-如有问题，欢迎在 [Issues](https://github.com/countbot-ai/CountBot/issues) 中提问。
+如有问题，欢迎在 [Issues](https://github.com/countbot-ai/AIE/issues) 中提问。
