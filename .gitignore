@@ -60,3 +60,6 @@ data/*.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Reference code (external)
+refcode/
