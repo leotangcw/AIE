@@ -1,15 +1,16 @@
-"""AIE 知识库 RAG 系统"""
+"""AIE 知识库 RAG 系统 - 多模式检索"""
 
 import json
 import os
 import uuid
-import hashlib
+import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 from loguru import logger
+from collections import Counter
 
-from backend.utils.paths import MEMORY_DIR
+from backend.utils.paths import MEMORY_DIR, WORKSPACE_DIR
 
 
 class KnowledgeSource:
@@ -18,15 +19,19 @@ class KnowledgeSource:
     def __init__(
         self,
         name: str,
-        source_type: str,  # local, wiki, database, api
+        source_type: Literal["local", "api", "database", "wiki"],
         config: dict,
         enabled: bool = True,
+        priority: int = 5,
+        sync_interval: int = 60,
     ):
         self.id = str(uuid.uuid4())
         self.name = name
         self.source_type = source_type
         self.config = config
         self.enabled = enabled
+        self.priority = priority  # 1-10, 优先级越高越先检索
+        self.sync_interval = sync_interval  # 同步间隔(分钟)
         self.created_at = datetime.now().isoformat()
         self.last_sync = None
 
@@ -37,9 +42,27 @@ class KnowledgeSource:
             "source_type": self.source_type,
             "config": self.config,
             "enabled": self.enabled,
+            "priority": self.priority,
+            "sync_interval": self.sync_interval,
             "created_at": self.created_at,
             "last_sync": self.last_sync,
         }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "KnowledgeSource":
+        """从字典创建"""
+        source = cls(
+            name=data["name"],
+            source_type=data["source_type"],
+            config=data.get("config", {}),
+            enabled=data.get("enabled", True),
+            priority=data.get("priority", 5),
+            sync_interval=data.get("sync_interval", 60),
+        )
+        source.id = data.get("id", source.id)
+        source.created_at = data.get("created_at", source.created_at)
+        source.last_sync = data.get("last_sync")
+        return source
 
 
 class KnowledgeChunk:
@@ -69,16 +92,314 @@ class KnowledgeChunk:
         }
 
 
-class KnowledgeRAG:
-    """知识库 RAG 系统"""
+class KnowledgeRef:
+    """知识引用 - 用于记录检索到的知识"""
 
-    def __init__(self, storage_dir: Path = None):
+    def __init__(
+        self,
+        source_id: str,
+        source_name: str,
+        content: str,
+        file_path: str = None,
+        line_start: int = None,
+        line_end: int = None,
+        score: float = 0.0,
+    ):
+        self.source_id = source_id
+        self.source_name = source_name
+        self.content = content
+        self.file_path = file_path
+        self.line_start = line_start
+        self.line_end = line_end
+        self.score = score
+
+    def to_dict(self) -> dict:
+        return {
+            "source_id": self.source_id,
+            "source_name": self.source_name,
+            "content": self.content,
+            "file_path": self.file_path,
+            "line_start": self.line_start,
+            "line_end": self.line_end,
+            "score": self.score,
+        }
+
+
+class RAGSkillRetriever:
+    """rag-skill 风格检索器 - 基于目录结构检索"""
+
+    def __init__(self, knowledge_dir: Path):
+        self.knowledge_dir = knowledge_dir
+
+    def retrieve(self, query: str, top_k: int = 5) -> list[KnowledgeRef]:
+        """检索知识"""
+        results = []
+
+        # 1. 查找 data_structure.md 了解目录结构
+        data_structure = self.knowledge_dir / "data_structure.md"
+        if data_structure.exists():
+            structure_content = data_structure.read_text(encoding="utf-8")
+            # 查找与问题相关的目录
+            related_dirs = self._find_related_dirs(structure_content, query)
+            for dir_path in related_dirs:
+                # 递归检索目录下的文档
+                dir_results = self._search_directory(dir_path, query, top_k // 2)
+                results.extend(dir_results)
+
+        # 2. 直接全文搜索
+        if len(results) < top_k:
+            direct_results = self._direct_search(query, top_k)
+            results.extend(direct_results)
+
+        # 去重并排序
+        results = self._deduplicate(results)[:top_k]
+        return results
+
+    def _find_related_dirs(self, structure: str, query: str) -> list[Path]:
+        """查找相关目录"""
+        query_keywords = set(query.lower().split())
+        related = []
+
+        lines = structure.split("\n")
+        for line in lines:
+            # 查找目录或标题
+            if "##" in line or "###" in line:
+                dir_name = line.replace("#", "").strip()
+                if query_keywords & set(dir_name.lower().split()):
+                    # 尝试找到对应的目录
+                    dir_path = self.knowledge_dir / dir_name
+                    if dir_path.exists():
+                        related.append(dir_path)
+
+        return related[:3]
+
+    def _search_directory(self, dir_path: Path, query: str, limit: int) -> list[KnowledgeRef]:
+        """搜索目录"""
+        results = []
+        query_keywords = query.lower().split()
+
+        # 搜索 Markdown 文件
+        for md_file in dir_path.rglob("*.md"):
+            if md_file.name == "data_structure.md":
+                continue
+
+            try:
+                content = md_file.read_text(encoding="utf-8")
+                # 简单关键词匹配
+                if any(kw in content.lower() for kw in query_keywords):
+                    # 查找匹配的行
+                    lines = content.split("\n")
+                    for i, line in enumerate(lines):
+                        if any(kw in line.lower() for kw in query_keywords):
+                            # 提取上下文
+                            start = max(0, i - 3)
+                            end = min(len(lines), i + 4)
+                            context = "\n".join(lines[start:end])
+
+                            results.append(KnowledgeRef(
+                                source_id="local",
+                                source_name=str(md_file.relative_to(self.knowledge_dir)),
+                                content=context,
+                                file_path=str(md_file),
+                                line_start=i + 1,
+                                line_end=i + 1,
+                                score=1.0
+                            ))
+
+                            if len(results) >= limit:
+                                return results
+            except Exception as e:
+                logger.warning(f"Failed to read {md_file}: {e}")
+
+        return results
+
+    def _direct_search(self, query: str, limit: int) -> list[KnowledgeRef]:
+        """直接搜索"""
+        results = []
+        query_keywords = query.lower().split()
+
+        for md_file in self.knowledge_dir.rglob("*.md"):
+            if md_file.name == "data_structure.md":
+                continue
+
+            try:
+                content = md_file.read_text(encoding="utf-8")
+                if any(kw in content.lower() for kw in query_keywords):
+                    # 简单返回文件的前几段
+                            content = md_file.read_text(encoding="utf-8")
+                            # 找到第一个匹配位置
+                            idx = min(content.lower().find(kw) for kw in query_keywords if kw in content.lower())
+                            # 提取附近内容
+                            start = max(0, idx - 200)
+                            end = min(len(content), idx + 500)
+                            context = content[start:end]
+
+                            results.append(KnowledgeRef(
+                                source_id="local",
+                                source_name=str(md_file.relative_to(self.knowledge_dir)),
+                                content=context,
+                                file_path=str(md_file),
+                                score=0.8
+                            ))
+
+                            if len(results) >= limit:
+                                return results
+            except Exception:
+                pass
+
+        return results
+
+    def _deduplicate(self, results: list[KnowledgeRef]) -> list[KnowledgeRef]:
+        """去重"""
+        seen = set()
+        unique = []
+        for r in results:
+            key = r.file_path or r.content[:50]
+            if key not in seen:
+                seen.add(key)
+                unique.append(r)
+        return unique
+
+
+class BM25Retriever:
+    """BM25 检索器"""
+
+    def __init__(self):
+        self.chunks: list[KnowledgeChunk] = []
+        self.doc_lengths: list[int] = []
+        self.avg_doc_length: float = 0
+        self.k1 = 1.5
+        self.b = 0.75
+
+    def add_chunks(self, chunks: list[KnowledgeChunk]):
+        """添加知识块"""
+        self.chunks = chunks
+        self.doc_lengths = [len(c.content) for c in chunks]
+        self.avg_doc_length = sum(self.doc_lengths) / len(self.doc_lengths) if self.doc_lengths else 1
+
+    def _tokenize(self, text: str) -> list[str]:
+        """分词"""
+        return re.findall(r'\w+', text.lower())
+
+    def _calculate_idf(self, term: str) -> float:
+        """计算 IDF"""
+        containing_docs = sum(1 for chunk in self.chunks if term in chunk.content.lower())
+        if containing_docs == 0:
+            return 0
+        return math.log((len(self.chunks) - containing_docs + 0.5) / (containing_docs + 0.5) + 1)
+
+    def retrieve(self, query: str, top_k: int = 5) -> list[KnowledgeRef]:
+        """BM25 检索"""
+        if not self.chunks:
+            return []
+
+        query_terms = self._tokenize(query)
+        scores = []
+
+        for i, chunk in enumerate(self.chunks):
+            doc_terms = self._tokenize(chunk.content)
+            doc_tf = Counter(doc_terms)
+
+            score = 0.0
+            for term in query_terms:
+                if term in doc_tf:
+                    tf = doc_tf[term]
+                    idf = self._calculate_idf(term)
+                    # BM25 公式
+                    numerator = tf * (self.k1 + 1)
+                    denominator = tf + self.k1 * (1 - self.b + self.b * len(doc_terms) / self.avg_doc_length)
+                    score += idf * numerator / denominator
+
+            if score > 0:
+                scores.append((score, chunk))
+
+        scores.sort(key=lambda x: x[0], reverse=True)
+
+        return [
+            KnowledgeRef(
+                source_id=chunk.source_id,
+                source_name=chunk.metadata.get("source_name", chunk.source_id),
+                content=chunk.content,
+                score=score
+            )
+            for score, chunk in scores[:top_k]
+        ]
+
+
+class VectorRetriever:
+    """简化版向量检索器"""
+
+    def __init__(self):
+        self.chunks: list[KnowledgeChunk] = []
+
+    def add_chunks(self, chunks: list[KnowledgeChunk]):
+        """添加知识块"""
+        self.chunks = chunks
+
+    def _simple_embed(self, text: str) -> list[float]:
+        """简化版 embedding - 使用词频向量"""
+        words = re.findall(r'\w+', text.lower())
+        word_freq = Counter(words)
+        # 取最常见的 100 个词作为维度
+        vocab = [w for w, _ in word_freq.most_common(100)]
+        vec = [word_freq.get(w, 0) for w in vocab]
+        # 归一化
+        total = sum(v * v for v in vec) ** 0.5
+        return [v / total if total > 0 else 0 for v in vec]
+
+    def _cosine_similarity(self, a: list[float], b: list[float]) -> float:
+        """余弦相似度"""
+        dot = sum(x * y for x, y in zip(a, b))
+        norm_a = sum(x * x for x in a) ** 0.5
+        norm_b = sum(x * x for x in b) ** 0.5
+        if norm_a == 0 or norm_b == 0:
+            return 0
+        return dot / (norm_a * norm_b)
+
+    def retrieve(self, query: str, top_k: int = 5) -> list[KnowledgeRef]:
+        """向量检索"""
+        if not self.chunks:
+            return []
+
+        query_vec = self._simple_embed(query)
+        scores = []
+
+        for chunk in self.chunks:
+            # 简化：每次重新计算（生产环境应该缓存）
+            chunk_vec = self._simple_embed(chunk.content)
+            score = self._cosine_similarity(query_vec, chunk_vec)
+            if score > 0.01:  # 阈值过滤
+                scores.append((score, chunk))
+
+        scores.sort(key=lambda x: x[0], reverse=True)
+
+        return [
+            KnowledgeRef(
+                source_id=chunk.source_id,
+                source_name=chunk.metadata.get("source_name", chunk.source_id),
+                content=chunk.content,
+                score=score
+            )
+            for score, chunk in scores[:top_k]
+        ]
+
+
+class KnowledgeRAG:
+    """知识库 RAG 系统 - 多模式检索"""
+
+    def __init__(self, storage_dir: Path = None, workspace_dir: Path = None):
         self.storage_dir = storage_dir or MEMORY_DIR / "knowledge"
+        self.workspace_dir = workspace_dir or WORKSPACE_DIR
         self.sources_dir = self.storage_dir / "sources"
         self.chunks_dir = self.storage_dir / "chunks"
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.sources_dir.mkdir(parents=True, exist_ok=True)
         self.chunks_dir.mkdir(parents=True, exist_ok=True)
+
+        # 初始化检索器
+        self.rag_skill_retriever = RAGSkillRetriever(self.workspace_dir / "knowledge")
+        self.bm25_retriever = BM25Retriever()
+        self.vector_retriever = VectorRetriever()
 
         self._sources: dict[str, KnowledgeSource] = {}
         self._chunks: list[KnowledgeChunk] = []
@@ -90,15 +411,7 @@ class KnowledgeRAG:
         for file in self.sources_dir.glob("*.json"):
             try:
                 data = json.loads(file.read_text(encoding="utf-8"))
-                source = KnowledgeSource(
-                    name=data["name"],
-                    source_type=data["source_type"],
-                    config=data.get("config", {}),
-                    enabled=data.get("enabled", True),
-                )
-                source.id = data.get("id", source.id)
-                source.created_at = data.get("created_at", source.created_at)
-                source.last_sync = data.get("last_sync")
+                source = KnowledgeSource.from_dict(data)
                 self._sources[source.id] = source
             except Exception as e:
                 logger.warning(f"Failed to load source from {file}: {e}")
@@ -115,10 +428,13 @@ class KnowledgeRAG:
                         metadata=item.get("metadata", {}),
                     )
                     chunk.id = item.get("id", chunk.id)
-                    chunk.created_at = item.get("created_at", chunk.created_at)
                     self._chunks.append(chunk)
             except Exception as e:
                 logger.warning(f"Failed to load chunks: {e}")
+
+        # 初始化 BM25 和向量检索器
+        self.bm25_retriever.add_chunks(self._chunks)
+        self.vector_retriever.add_chunks(self._chunks)
 
         logger.info(f"Loaded {len(self._sources)} sources and {len(self._chunks)} chunks")
 
@@ -138,6 +454,11 @@ class KnowledgeRAG:
             json.dumps([c.to_dict() for c in self._chunks], ensure_ascii=False, indent=2),
             encoding="utf-8"
         )
+        # 更新检索器
+        self.bm25_retriever.add_chunks(self._chunks)
+        self.vector_retriever.add_chunks(self._chunks)
+
+    # ========== 知识源管理 ==========
 
     def add_source(self, source: KnowledgeSource):
         """添加知识源"""
@@ -153,6 +474,19 @@ class KnowledgeRAG:
         """获取所有知识源"""
         return list(self._sources.values())
 
+    def update_source(self, source_id: str, **kwargs) -> bool:
+        """更新知识源"""
+        source = self._sources.get(source_id)
+        if not source:
+            return False
+
+        for key, value in kwargs.items():
+            if hasattr(source, key):
+                setattr(source, key, value)
+
+        self._save_sources()
+        return True
+
     def delete_source(self, source_id: str) -> bool:
         """删除知识源"""
         if source_id in self._sources:
@@ -164,9 +498,50 @@ class KnowledgeRAG:
             return True
         return False
 
+    def sync_source(self, source_id: str) -> bool:
+        """同步知识源"""
+        source = self._sources.get(source_id)
+        if not source:
+            return False
+
+        if source.source_type == "local":
+            # 同步本地目录
+            self._sync_local_source(source)
+
+        source.last_sync = datetime.now().isoformat()
+        self._save_sources()
+        return True
+
+    def _sync_local_source(self, source: KnowledgeSource):
+        """同步本地知识目录"""
+        local_path = source.config.get("path")
+        if not local_path:
+            return
+
+        path = Path(local_path)
+        if not path.exists():
+            logger.warning(f"Knowledge path not found: {local_path}")
+            return
+
+        # 扫描 Markdown 文件
+        for md_file in path.rglob("*.md"):
+            if md_file.name.startswith("."):
+                continue
+
+            try:
+                content = md_file.read_text(encoding="utf-8")
+                metadata = {
+                    "source_name": str(md_file.relative_to(path)),
+                    "file_path": str(md_file),
+                }
+                self.add_document(source.id, content, metadata)
+            except Exception as e:
+                logger.warning(f"Failed to sync {md_file}: {e}")
+
+    # ========== 文档管理 ==========
+
     def add_document(self, source_id: str, content: str, metadata: dict = None):
         """添加文档到知识库"""
-        # 简单的文本分块
         chunk_size = 1000
         overlap = 100
 
@@ -185,78 +560,101 @@ class KnowledgeRAG:
         self._save_chunks()
         logger.info(f"Added {len(chunks)} chunks from document")
 
-        # 更新同步时间
-        source = self._sources.get(source_id)
-        if source:
-            source.last_sync = datetime.now().isoformat()
-            self._save_sources()
-
         return len(chunks)
 
-    def retrieve(self, query: str, top_k: int = 5, source_ids: list[str] = None) -> list[KnowledgeChunk]:
-        """检索相关知识 - 简化版基于关键词匹配"""
-        # 简化实现: 基于关键词匹配
-        # 生产环境应使用向量相似度
+    # ========== 多模式检索 ==========
 
-        query_keywords = set(query.lower().split())
-        scored_chunks = []
+    def retrieve(
+        self,
+        query: str,
+        method: Literal["auto", "rag-skill", "bm25", "vector"] = "auto",
+        top_k: int = 5,
+        source_ids: list[str] = None
+    ) -> list[KnowledgeRef]:
+        """
+        检索知识
 
-        for chunk in self._chunks:
-            # 过滤来源
-            if source_ids and chunk.source_id not in source_ids:
-                continue
+        Args:
+            query: 查询文本
+            method: 检索方式 (auto/bm25/rag-skill/vector)
+            top_k: 返回数量
+            source_ids: 知识源过滤
+        """
+        # 自动选择最优方式
+        if method == "auto":
+            method = self._select_best_method(query)
 
-            # 计算关键词重叠
-            content_keywords = set(chunk.content.lower().split())
-            overlap = query_keywords & content_keywords
-            if overlap:
-                scored_chunks.append((len(overlap), chunk))
+        results = []
 
-        # 按得分排序
-        scored_chunks.sort(key=lambda x: x[0], reverse=True)
+        if method == "rag-skill":
+            # rag-skill 风格检索
+            results = self.rag_skill_retriever.retrieve(query, top_k)
+        elif method == "bm25":
+            # BM25 检索
+            results = self.bm25_retriever.retrieve(query, top_k)
+        elif method == "vector":
+            # 向量检索
+            results = self.vector_retriever.retrieve(query, top_k)
 
-        # 返回 top_k
-        return [chunk for _, chunk in scored_chunks[:top_k]]
+        # 来源过滤
+        if source_ids:
+            results = [r for r in results if r.source_id in source_ids]
 
-    def augment_context(self, query: str, context: dict, top_k: int = 3) -> dict:
+        return results
+
+    def _select_best_method(self, query: str) -> str:
+        """自动选择最优检索方式"""
+        # 检查知识目录是否存在
+        knowledge_dir = self.workspace_dir / "knowledge"
+        if knowledge_dir.exists() and (knowledge_dir / "data_structure.md").exists():
+            # 有目录结构，使用 rag-skill
+            return "rag-skill"
+
+        # 否则使用 BM25
+        return "bm25"
+
+    def retrieve_all_methods(
+        self,
+        query: str,
+        top_k: int = 5
+    ) -> dict[str, list[KnowledgeRef]]:
+        """使用所有方式检索并合并结果"""
+        results = {
+            "rag-skill": self.retrieve(query, "rag-skill", top_k),
+            "bm25": self.retrieve(query, "bm25", top_k),
+            "vector": self.retrieve(query, "vector", top_k),
+        }
+        return results
+
+    def augment_context(
+        self,
+        query: str,
+        context: dict,
+        method: str = "auto",
+        top_k: int = 3
+    ) -> dict:
         """增强上下文"""
-        # 检索相关知识
-        chunks = self.retrieve(query, top_k=top_k)
+        chunks = self.retrieve(query, method, top_k)
 
         if not chunks:
             return context
 
-        # 添加检索到的知识到上下文
+        # 构建知识上下文
         knowledge_context = "\n\n".join([
-            f"[知识 {i+1}]: {chunk.content}"
-            for i, chunk in enumerate(chunks)
+            f"[知识 {i+1} ({r.source_name})]: {r.content}"
+            for i, r in enumerate(chunks)
         ])
 
         # 构建增强后的上下文
         augmented = {
             **context,
             "knowledge_context": knowledge_context,
-            "knowledge_sources": [c.source_id for c in chunks],
+            "knowledge_sources": [r.source_name for r in chunks],
             "knowledge_count": len(chunks),
+            "knowledge_method": method if method != "auto" else self._select_best_method(query),
         }
 
         return augmented
-
-
-class KnowledgeAPI:
-    """知识库 API"""
-
-    def __init__(self, rag: KnowledgeRAG):
-        self.rag = rag
-
-    async def load_document(self, source_id: str, file_path: Path, metadata: dict = None) -> int:
-        """加载文档"""
-        try:
-            content = file_path.read_text(encoding="utf-8")
-            return self.rag.add_document(source_id, content, metadata)
-        except Exception as e:
-            logger.error(f"Failed to load document: {e}")
-            return 0
 
 
 # 全局实例
@@ -267,4 +665,11 @@ def get_knowledge_rag() -> KnowledgeRAG:
     global _rag
     if _rag is None:
         _rag = KnowledgeRAG()
+    return _rag
+
+
+def reinit_knowledge_rag():
+    """重新初始化知识库"""
+    global _rag
+    _rag = KnowledgeRAG()
     return _rag
