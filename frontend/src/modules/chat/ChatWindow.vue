@@ -10,7 +10,7 @@
           class="title title-clickable brand-title"
           @click="showSystemSidebar = !showSystemSidebar"
         >
-          <span class="brand-count">Count</span><span class="brand-bot">Bot</span>
+          <span class="brand-ai">AI</span><span class="brand-e">E</span>
         </h1>
       </div>
       
@@ -1626,53 +1626,48 @@ onBeforeUnmount(() => {
   gap: 0;
 }
 
-.brand-count {
-  color: var(--text-primary, #1f2937);
-  transition: all 0.2s ease;
-}
-
-.brand-bot {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
+.brand-ai {
+  background: linear-gradient(135deg, #00f0ff 0%, #0080ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   font-weight: 800;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
-.title-clickable:hover .brand-count {
+.brand-e {
+  color: var(--text-primary, #1f2937);
+  font-weight: 800;
+  transition: all 0.3s ease;
+}
+
+.title-clickable:hover .brand-ai {
+  background: linear-gradient(135deg, #33f5ff 0%, #00a0ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: brandBounce 0.5s ease;
+}
+
+.title-clickable:hover .brand-e {
   color: var(--color-primary, #3b82f6);
 }
 
-.title-clickable:hover .brand-bot {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%);
+/* Dark theme brand colors */
+:root[data-theme="dark"] .brand-ai {
+  background: linear-gradient(135deg, #00f0ff 0%, #00d4ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  transform: translateY(-1px);
 }
 
-/* Dark theme brand colors */
-:root[data-theme="dark"] .brand-count {
+:root[data-theme="dark"] .brand-e {
   color: var(--text-primary, #e5e7eb);
 }
 
-:root[data-theme="dark"] .brand-bot {
-  background: linear-gradient(135deg, #00f0ff 0%, #00d4ff 50%, #00b8ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-:root[data-theme="dark"] .title-clickable:hover .brand-count {
-  color: #00f0ff;
-}
-
-:root[data-theme="dark"] .title-clickable:hover .brand-bot {
-  background: linear-gradient(135deg, #33f5ff 0%, #00f0ff 50%, #00d4ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+@keyframes brandBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
 .icon-btn {
