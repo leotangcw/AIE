@@ -143,22 +143,22 @@ PROVIDER_REGISTRY = {
     # 阿里云百炼 - 作为 OpenAI 兼容端点
     "qwen": ProviderMetadata(
         id="qwen",
-        name="阿里云百炼 (Coding Plan) - 请用Custom API",
+        name="阿里云百炼 (Coding Plan)",
         default_api_base="https://coding.dashscope.aliyuncs.com/v1",
         default_model="qwen3.5-plus",
         litellm_prefix="openai",
-        skip_prefixes=("qwen-", "qwen3.5", "qwen-coder"),
+        skip_prefixes=("qwen-", "qwen-coder"),  # 移除 qwen3.5 以支持 qwen3.5-plus
         env_key=None,
         env_extras=[],
         model_overrides={},
     ),
     "qwen_bailian": ProviderMetadata(
         id="qwen_bailian",
-        name="阿里云百炼 (按量计费) - 请用Custom API",
+        name="阿里云百炼 (按量计费)",
         default_api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
         default_model="qwen3.5-plus",
         litellm_prefix="openai",
-        skip_prefixes=("qwen-", "qwen3.5", "qwen-coder"),
+        skip_prefixes=("qwen-", "qwen-coder"),  # 移除 qwen3.5 以支持 qwen3.5-plus
         env_key=None,
         env_extras=[],
         model_overrides={},
