@@ -1,4 +1,4 @@
-"""AIE 探索式问题解决系统"""
+"""AIE Research Session System"""
 
 import json
 import uuid
@@ -8,6 +8,7 @@ from typing import Any, Optional, Literal
 from loguru import logger
 
 from backend.utils.paths import MEMORY_DIR
+from backend.modules.agent.research_logger import get_research_logger, ResearchLogger
 
 
 class Exploration:
@@ -127,13 +128,16 @@ class ResearchSession:
 
 
 class ResearchManager:
-    """研究管理器"""
+    """Research manager"""
 
     def __init__(self, storage_dir: Path = None):
         self.storage_dir = storage_dir or MEMORY_DIR / "research"
         self.sessions_dir = self.storage_dir / "sessions"
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
+
+        # Initialize logger
+        self.logger: ResearchLogger = get_research_logger()
 
         self._sessions: dict[str, ResearchSession] = {}
         self._load_recent_sessions()
@@ -195,9 +199,17 @@ class ResearchManager:
         )
 
     def create_session(self, query: str, session_type: str = "chat") -> ResearchSession:
-        """创建新会话"""
+        """Create new session"""
         session = ResearchSession(query=query, session_type=session_type)
         self._sessions[session.id] = session
+
+        # Also start logging session
+        self.logger.start_session(
+            session_id=session.id,
+            query=query,
+            metadata={"session_type": session_type}
+        )
+
         logger.info(f"Created research session: {session.id}")
         return session
 
@@ -252,7 +264,7 @@ class ResearchManager:
         content: str,
         metadata: dict = None
     ) -> bool:
-        """添加探索记录"""
+        """Add exploration record"""
         session = self.get_session(session_id)
         if not session:
             return False
@@ -260,23 +272,46 @@ class ResearchManager:
         exploration = Exploration(exploration_type, content, metadata)
         session.add_exploration(exploration)
 
-        # 实时保存
+        # Also log to JSONL
+        self.logger.log(
+            log_type=exploration_type,
+            content=content,
+            session_id=session_id,
+            metadata=metadata,
+        )
+
+        # Real-time save
         self._save_session(session)
 
         return True
 
     def add_knowledge_ref(self, session_id: str, knowledge_ref: dict):
-        """添加知识引用"""
+        """Add knowledge reference"""
         session = self.get_session(session_id)
         if session:
             session.add_knowledge(knowledge_ref)
 
+            # Also log retrieved knowledge
+            self.logger.log_retrieved(
+                session_id=session_id,
+                content=knowledge_ref.get("content", "")[:500],
+                source=knowledge_ref.get("source_name"),
+                score=knowledge_ref.get("score"),
+            )
+
     def complete_session(self, session_id: str, solution: str, success: bool):
-        """完成会话"""
+        """Complete session"""
         session = self.get_session(session_id)
         if session:
             session.complete(solution, success)
             self._save_session(session)
+
+            # Also end logging session
+            self.logger.end_session(
+                session_id=session_id,
+                summary=f"Session completed: success={success}, need_consolidation={session.need_consolidation}"
+            )
+
             logger.info(f"Completed research session: {session_id}, success={success}, need_consolidation={session.need_consolidation}")
 
     def get_sessions_for_consolidation(self, limit: int = 10) -> list[ResearchSession]:
