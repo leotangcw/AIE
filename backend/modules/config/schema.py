@@ -14,8 +14,8 @@ class ProviderConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     """模型配置"""
-    provider: str = "zhipu"
-    model: str = "glm-5"
+    provider: str = "qwen"
+    model: str = "qwen3.5-plus"
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=0, ge=0, le=100000)
     max_iterations: int = Field(default=9999, ge=1, le=99999, description="最大工具调用次数，9999表示无限制")
@@ -178,11 +178,25 @@ class AppConfig(BaseModel):
         for provider_id in get_provider_ids():
             if provider_id not in self.providers:
                 metadata = get_provider_metadata(provider_id)
-                
+
                 if provider_id == "zhipu":
                     self.providers[provider_id] = ProviderConfig(
                         api_key="",
                         api_base="https://open.bigmodel.cn/api/paas/v4",
+                        enabled=True
+                    )
+                elif provider_id == "qwen":
+                    # 阿里云百炼 Coding Plan 默认配置
+                    self.providers[provider_id] = ProviderConfig(
+                        api_key="sk-sp-8dcb9a2e9a834906b6d414fd1ddf38f3",
+                        api_base="https://coding.dashscope.aliyuncs.com/v1",
+                        enabled=True
+                    )
+                elif provider_id == "qwen_bailian":
+                    # 阿里云百炼按量计费默认配置
+                    self.providers[provider_id] = ProviderConfig(
+                        api_key="",
+                        api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
                         enabled=True
                     )
                 else:

@@ -1,4 +1,4 @@
-"""AIE 知识沉淀系统"""
+"""AIE Knowledge Consolidation System"""
 
 import json
 import uuid
@@ -11,7 +11,7 @@ from backend.utils.paths import MEMORY_DIR, SKILLS_DIR, WORKSPACE_DIR
 
 
 class ConsolidationResult:
-    """沉淀结果"""
+    """Consolidation result"""
 
     def __init__(
         self,
@@ -26,7 +26,7 @@ class ConsolidationResult:
         self.session_id = session_id
         self.problem_summary = problem_summary
         self.solution_steps = solution_steps
-        self.pitfalls = pitfalls  # 踩坑记录
+        self.pitfalls = pitfalls  # pitfalls/mistakes encountered
         self.new_knowledge = new_knowledge
         self.skill_name = skill_name
         self.created_at = datetime.now().isoformat()
@@ -36,7 +36,7 @@ class ConsolidationResult:
         md = f"""---
 title: {self.problem_summary}
 type: solution
-tags: [经验, 沉淀]
+tags: [experience, solution]
 source: research_session_{self.session_id}
 created: {self.created_at}
 ---
@@ -53,7 +53,7 @@ created: {self.created_at}
             md += f"{i}. {step}\n"
 
         if self.pitfalls:
-            md += "\n## 踩坑记录\n"
+            md += "\n## Pitfalls\n"
             for pitfall in self.pitfalls:
                 md += f"- {pitfall}\n"
 
@@ -77,7 +77,7 @@ created: {self.created_at}
 
 
 class Consolidator:
-    """知识沉淀器"""
+    """Knowledge consolidator"""
 
     def __init__(
         self,
@@ -92,27 +92,27 @@ class Consolidator:
 
     def consolidate_session(self, session) -> ConsolidationResult:
         """
-        将会话沉淀为知识文档
+        Consolidate session into knowledge document
 
-        分析研究会话，提取：
-        - 问题模式
-        - 解决步骤
-        - 踩坑记录
-        - 参考知识
+        Analyze research session and extract:
+        - Problem patterns
+        - Solution steps
+        - Pitfalls encountered
+        - Referenced knowledge
         """
-        # 1. 分析问题
+        # 1. Analyze problem
         problem_summary = self._analyze_problem(session)
 
-        # 2. 提取解决步骤
+        # 2. Extract solution steps
         solution_steps = self._extract_solution_steps(session)
 
-        # 3. 提取踩坑记录
+        # 3. Extract pitfalls
         pitfalls = self._extract_pitfalls(session)
 
-        # 4. 提取新增知识
+        # 4. Extract new knowledge
         new_knowledge = self._extract_new_knowledge(session)
 
-        # 5. 生成沉淀
+        # 5. Generate consolidation
         result = ConsolidationResult(
             session_id=session.id,
             problem_summary=problem_summary,
@@ -166,7 +166,7 @@ class Consolidator:
         return steps[:10]  # 最多 10 步
 
     def _extract_pitfalls(self, session) -> list[str]:
-        """提取踩坑记录"""
+        """Extract pitfalls encountered"""
         pitfalls = []
 
         for exp in session.explorations:

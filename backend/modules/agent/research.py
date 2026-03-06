@@ -59,9 +59,9 @@ class ResearchSession:
         self.final_solution: str = ""
         self.success: bool = False
 
-        # 自动标记
+        # auto-tagged flag
         self.auto_tagged: bool = False
-        self.need_consolidation: bool = False  # 需要沉淀
+        self.need_consolidation: bool = False  # needs knowledge consolidation
 
         # 统计
         self.tool_calls: int = 0
@@ -85,15 +85,15 @@ class ResearchSession:
         self.final_solution = solution
         self.success = success
 
-        # 自动标记
+        # auto-tag
         self._auto_tag()
 
     def _auto_tag(self):
-        """自动标记是否需要沉淀"""
-        # 需要沉淀的条件：
-        # 1. 参考了企业知识
-        # 2. 进行了探索尝试
-        # 3. 最终成功解决问题
+        """Auto-tag if consolidation is needed"""
+        # Consolidation needed when:
+        # 1. Referenced enterprise knowledge
+        # 2. Made exploration attempts
+        # 3. Successfully solved the problem
 
         has_knowledge = len(self.retrieved_knowledge) > 0
         has_exploration = len(self.explorations) > 3  # 至少 3 次探索
@@ -120,7 +120,7 @@ class ResearchSession:
 
     @property
     def duration(self) -> float:
-        """会话时长（秒）"""
+        """Session duration in seconds"""
         if self.end_time:
             return (self.end_time - self.start_time).total_seconds()
         return (datetime.now() - self.start_time).total_seconds()
@@ -280,7 +280,7 @@ class ResearchManager:
             logger.info(f"Completed research session: {session_id}, success={success}, need_consolidation={session.need_consolidation}")
 
     def get_sessions_for_consolidation(self, limit: int = 10) -> list[ResearchSession]:
-        """获取需要沉淀的会话"""
+        """Get sessions that need consolidation"""
         sessions = []
         index_file = self.storage_dir / "index.json"
 
