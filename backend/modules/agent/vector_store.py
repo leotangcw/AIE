@@ -65,20 +65,24 @@ class VectorStore:
         logger.info(f"Vector store initialized at {self.db_path}")
 
     def _get_embedding_model(self):
-        """Lazy load embedding model"""
+        """Lazy load embedding model (auto-download on first use)"""
         if self.embedding_model is None:
             try:
                 from sentence_transformers import SentenceTransformer
 
-                logger.info(f"Loading embedding model: {self.embedding_model_name}")
-                # Use CPU explicitly
+                logger.info(f"Loading embedding model: {self.embedding_model_name} (will auto-download if first time)")
+                # Use CPU explicitly, will auto-download model from HuggingFace on first run
                 self.embedding_model = SentenceTransformer(
                     self.embedding_model_name,
                     device="cpu"
                 )
                 logger.info(f"Embedding model loaded successfully")
             except ImportError:
-                logger.error("sentence-transformers not installed. Install with: pip install sentence-transformers")
+                logger.error("sentence-transformers not installed. Run: pip install sentence-transformers")
+                raise
+            except Exception as e:
+                logger.error(f"Failed to load embedding model: {e}")
+                logger.info(f"Tip: Model will auto-download from HuggingFace on first use. Make sure network is accessible.")
                 raise
 
         return self.embedding_model
