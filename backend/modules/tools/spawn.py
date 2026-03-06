@@ -30,14 +30,15 @@ class SpawnTool(Tool):
     @property
     def name(self) -> str:
         return "spawn"
-    
+
     @property
     def description(self) -> str:
         return (
             "Spawn background agent for complex or time-consuming tasks. "
-            "Use when task requires multiple steps, tools, or takes significant time."
+            "Use when task requires multiple steps, tools, or takes significant time. "
+            "Supports different agent types: general, explore, research, debug, review, build."
         )
-    
+
     @property
     def parameters(self) -> dict[str, Any]:
         return {
@@ -51,30 +52,55 @@ class SpawnTool(Tool):
                     "type": "string",
                     "description": "Short label for task display (optional)",
                 },
+                "type": {
+                    "type": "string",
+                    "description": "Agent type: general, explore, research, debug, review, build (optional)",
+                    "enum": ["general", "explore", "research", "debug", "review", "build"],
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "Timeout in seconds (optional, default varies by type)",
+                },
             },
             "required": ["task"],
         }
-    
-    async def execute(self, task: str, label: str | None = None, **kwargs: Any) -> str:
+
+    async def execute(
+        self,
+        task: str,
+        label: str | None = None,
+        type: str = "general",
+        timeout: int = None,
+        **kwargs: Any,
+    ) -> str:
         """
         执行工具：生成子 Agent
-        
+
         Args:
             task: 任务描述
             label: 任务标签（可选）
-            
+            type: 子代理类型 (general/explore/research/debug/review/build)
+            timeout: 超时时间（秒）
+
         Returns:
             str: 状态消息
         """
+        from backend.modules.agent.subagent_types import SubagentType, SubagentDefaults
+
+        # 解析子代理类型
+        subagent_type = SubagentDefaults.from_string(type)
+
         # 创建任务
         task_id = self._manager.create_task(
             label=label or task[:30] + ("..." if len(task) > 30 else ""),
             message=task,
             session_id=self._session_id,
+            subagent_type=subagent_type,
+            timeout=timeout,
         )
-        
+
         # 异步执行任务
         await self._manager.execute_task(task_id)
-        
+
         display_label = label or task[:30] + ("..." if len(task) > 30 else "")
         return f"子 Agent [{display_label}] 已启动 (ID: {task_id})。完成后我会通知你。"

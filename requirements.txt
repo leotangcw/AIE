@@ -40,3 +40,9 @@ python-telegram-bot>=20.7
 sentence-transformers>=2.2.0
 numpy>=1.24.0
 
+# 多模态文件读取（可选）
+pypdf>=3.0.0
+Pillow>=10.0.0
+pytesseract>=0.3.10
+opencv-python-headless>=4.8.0
+

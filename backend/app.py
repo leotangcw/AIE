@@ -365,6 +365,7 @@ from backend.api.rules import router as rules_router
 from backend.api.security import router as security_router
 from backend.api.knowledge import router as knowledge_router
 from backend.api.research import router as research_router
+from backend.api.plugins import router as plugins_router
 
 app.include_router(auth_router)
 app.include_router(chat_router)
@@ -384,6 +385,7 @@ app.include_router(rules_router)
 app.include_router(security_router)
 app.include_router(knowledge_router)
 app.include_router(research_router)
+app.include_router(plugins_router)
 
 
 # WebSocket 端点
@@ -492,6 +494,23 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "version": "1.0.0", "name": "AIE"}
+
+
+# 插件系统初始化
+@app.on_event("startup")
+async def init_plugins():
+    """应用启动时初始化插件系统"""
+    from backend.modules.plugins import get_plugin_manager
+    from backend.modules.plugins.superpowers import Plugin as SuperpowersPlugin
+    from pathlib import Path
+
+    # 初始化插件管理器
+    plugin_manager = get_plugin_manager()
+
+    # 注册内置插件
+    plugin_manager.register(SuperpowersPlugin(plugin_manager))
+
+    logger.info("Plugin system initialized")
 
 
 # 挂载前端静态文件 - 静态文件服务会自动处理 "/" 路径

@@ -1,0 +1,22 @@
+# 插件配置
+
+# 插件启用状态
+plugins:
+  # Superpowers 开发流程插件（默认关闭）
+  superpowers:
+    enabled: false
+    options:
+      auto_brainstorm: true   # 新功能自动头脑风暴
+      auto_code_review: true   # 完成后自动审查
+      auto_verify: true       # 完成后自动验证
+
+  # 知识库插件（默认开启）
+  knowledge:
+    enabled: true
+    options:
+      vector_model: "bge-small-zh-v1.5"
+      embedding_batch_size: 32
+
+  # 记忆系统插件（默认开启）
+  memory:
+    enabled: true

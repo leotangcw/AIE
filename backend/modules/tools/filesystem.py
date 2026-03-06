@@ -1,4 +1,4 @@
-"""文件系统工具 - 支持行号显示、行范围读取、追加写入、按行编辑"""
+"""文件系统工具 - 支持行号显示、行范围读取、追加写入、按行编辑、多模态文件读取"""
 
 from pathlib import Path
 from typing import Any
@@ -6,6 +6,7 @@ from typing import Any
 from loguru import logger
 
 from backend.modules.tools.base import Tool
+from backend.modules.tools.multimodal import MultimodalFileHandler
 
 
 class WorkspaceValidator:
@@ -53,11 +54,12 @@ class WorkspaceValidator:
 
 
 class ReadFileTool(Tool):
-    """读取文件工具 - 支持行号显示和按行范围读取"""
+    """读取文件工具 - 支持行号显示、按行范围读取、PDF/图片/视频"""
 
     def __init__(self, workspace: Path, skills_loader=None, restrict_to_workspace: bool = True):
         self.validator = WorkspaceValidator(workspace, restrict_to_workspace)
         self.skills_loader = skills_loader
+        self.multimodal_handler = MultimodalFileHandler(workspace)
         logger.debug("ReadFileTool initialized")
 
     @property
@@ -69,11 +71,14 @@ class ReadFileTool(Tool):
         return (
             "Read file contents with line numbers. "
             "Supports single file or batch mode (multiple files in one call). "
+            "Also supports PDF (text extraction), images (OCR), and videos. "
             "Line ranges: start_line/end_line (1-based, inclusive). "
             "Examples:\n"
             "- Single: read_file(path='a.py')\n"
             "- Range: read_file(path='a.py', start_line=10, end_line=20)\n"
             "- Batch: read_file(paths=['a.py', 'b.py', 'skills/weather/SKILL.md'])\n"
+            "- PDF: read_file(path='document.pdf') - extracts text\n"
+            "- Image: read_file(path='screenshot.png') - OCR + base64\n"
             "Batch mode is more efficient for multiple files (saves tool calls)."
         )
 
@@ -120,7 +125,7 @@ class ReadFileTool(Tool):
         # 参数验证：必须提供 path 或 paths 之一
         if not path_str and not paths_list:
             return "Error: Either 'path' or 'paths' parameter is required"
-        
+
         if path_str and paths_list:
             return "Error: Provide either 'path' or 'paths', not both"
 
@@ -128,32 +133,32 @@ class ReadFileTool(Tool):
         if paths_list:
             if not isinstance(paths_list, list):
                 return "Error: 'paths' must be an array of strings"
-            
+
             if not paths_list:
                 return "Error: 'paths' array is empty"
-            
+
             # 批量模式不支持行范围参数
             if start_line is not None or end_line is not None:
                 return "Error: Line range parameters (start_line/end_line) are not supported in batch mode"
-            
+
             return await self._read_multiple_files(paths_list, show_line_numbers)
-        
-        # 单文件模式：保持原有逻辑
+
+        # 单文件模式：检查是否为多模态文件
         return await self._read_single_file(path_str, start_line, end_line, show_line_numbers)
 
     async def _read_single_file(
-        self, 
-        path_str: str, 
-        start_line: int | None, 
-        end_line: int | None, 
+        self,
+        path_str: str,
+        start_line: int | None,
+        end_line: int | None,
         show_line_numbers: bool
     ) -> str:
-        """读取单个文件（原有逻辑）"""
+        """读取单个文件（支持多模态）"""
         if not path_str:
             return "Error: Path parameter is required"
 
         try:
-            # 禁用技能检查
+            # 检查技能是否启用
             if self.skills_loader:
                 file_path_check = Path(path_str)
                 if not file_path_check.is_absolute():
@@ -173,6 +178,20 @@ class ReadFileTool(Tool):
             if not file_path.is_file():
                 return f"Error: Not a file: {path_str}"
 
+            # 检查是否为多模态文件
+            ext = file_path.suffix.lower()
+            if ext in {'.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff', '.mp4', '.avi', '.mov', '.mkv', '.webm'}:
+                # 使用多模态处理器
+                result = await self.multimodal_handler.read_file(path_str)
+
+                if result["type"] == "text":
+                    # 文本文件继续原有逻辑
+                    content = file_path.read_text(encoding="utf-8")
+                elif result["type"] in ("pdf", "image", "video"):
+                    # 返回多模态内容
+                    return self._format_multimodal_result(result)
+
+            # 原有文本文件逻辑
             content = file_path.read_text(encoding="utf-8")
             lines = content.splitlines()
             total = len(lines)
@@ -277,6 +296,44 @@ class ReadFileTool(Tool):
         logger.info(f"Batch read completed: {success_count} succeeded, {error_count} failed out of {len(paths_list)} files")
         
         return "\n\n".join(results) + summary
+
+    def _format_multimodal_result(self, result: dict) -> str:
+        """格式化多模态文件读取结果"""
+        file_type = result["type"]
+        metadata = result.get("metadata", {})
+
+        parts = [f"=== {file_type.upper()} File ==="]
+
+        # 文件信息
+        parts.append(f"File: {metadata.get('file_name', 'unknown')}")
+        parts.append(f"Size: {metadata.get('size', 0)} bytes")
+
+        if file_type == "pdf":
+            pages = metadata.get("pages", 0)
+            parts.append(f"Pages: {pages}")
+
+        elif file_type == "image":
+            has_ocr = metadata.get("has_ocr", False)
+            parts.append(f"OCR Available: {has_ocr}")
+
+        elif file_type == "video":
+            duration = metadata.get("duration_seconds")
+            if duration:
+                parts.append(f"Duration: {duration}s")
+
+        # 文本内容（OCR提取或PDF文字）
+        if result.get("text"):
+            parts.append(f"\n--- Extracted Text ---")
+            parts.append(result["text"][:5000])  # 限制长度
+            if len(result["text"]) > 5000:
+                parts.append(f"\n... [truncated, total {len(result['text'])} chars]")
+
+        # Base64 内容（用于多模态模型）
+        if result.get("content"):
+            parts.append(f"\n--- Base64 Data ---")
+            parts.append(result["content"][:200] + "...")  # 只显示开头
+
+        return "\n".join(parts)
 
 
 class WriteFileTool(Tool):
