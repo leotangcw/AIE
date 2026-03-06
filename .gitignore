@@ -64,3 +64,4 @@ Thumbs.db
 # Reference code (external)
 refcode/
 .github_token
+memory/vector_store.db
