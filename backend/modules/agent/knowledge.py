@@ -1,4 +1,4 @@
-"""AIE 知识库 RAG 系统 - 多模式检索"""
+"""AIE Knowledge Base RAG System - Multi-mode Retrieval"""
 
 import json
 import os
@@ -11,6 +11,7 @@ from loguru import logger
 from collections import Counter
 
 from backend.utils.paths import MEMORY_DIR, WORKSPACE_DIR
+from backend.modules.agent.vector_store import get_vector_store, VectorStore
 
 
 class KnowledgeSource:
@@ -385,7 +386,7 @@ class VectorRetriever:
 
 
 class KnowledgeRAG:
-    """知识库 RAG 系统 - 多模式检索"""
+    """Knowledge Base RAG System - Multi-mode Retrieval"""
 
     def __init__(self, storage_dir: Path = None, workspace_dir: Path = None):
         self.storage_dir = storage_dir or MEMORY_DIR / "knowledge"
@@ -396,10 +397,13 @@ class KnowledgeRAG:
         self.sources_dir.mkdir(parents=True, exist_ok=True)
         self.chunks_dir.mkdir(parents=True, exist_ok=True)
 
-        # 初始化检索器
+        # Initialize retrievers
         self.rag_skill_retriever = RAGSkillRetriever(self.workspace_dir / "knowledge")
         self.bm25_retriever = BM25Retriever()
         self.vector_retriever = VectorRetriever()
+
+        # Initialize vector store (SQLite + bge-small-zh)
+        self.vector_store: VectorStore = get_vector_store()
 
         self._sources: dict[str, KnowledgeSource] = {}
         self._chunks: list[KnowledgeChunk] = []
@@ -538,14 +542,16 @@ class KnowledgeRAG:
             except Exception as e:
                 logger.warning(f"Failed to sync {md_file}: {e}")
 
-    # ========== 文档管理 ==========
+    # ========== Document Management ==========
 
     def add_document(self, source_id: str, content: str, metadata: dict = None):
-        """添加文档到知识库"""
+        """Add document to knowledge base"""
         chunk_size = 1000
         overlap = 100
 
         chunks = []
+        entries_for_vector_store = []
+
         for i in range(0, len(content), chunk_size - overlap):
             chunk_content = content[i:i + chunk_size]
             if chunk_content.strip():
@@ -556,61 +562,114 @@ class KnowledgeRAG:
                 )
                 chunks.append(chunk)
 
+                # Prepare for vector store
+                entries_for_vector_store.append({
+                    "content": chunk_content,
+                    "metadata": {**(metadata or {}), "chunk_index": i},
+                })
+
         self._chunks.extend(chunks)
         self._save_chunks()
+
+        # Also add to vector store for semantic search
+        if entries_for_vector_store:
+            try:
+                self.vector_store.add_batch(
+                    entries=entries_for_vector_store,
+                    source_type="knowledge",
+                    source_id=source_id,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to add to vector store: {e}")
+
         logger.info(f"Added {len(chunks)} chunks from document")
 
         return len(chunks)
 
-    # ========== 多模式检索 ==========
+    # ========== Multi-mode Retrieval ==========
 
     def retrieve(
         self,
         query: str,
-        method: Literal["auto", "rag-skill", "bm25", "vector"] = "auto",
+        method: Literal["auto", "rag-skill", "bm25", "vector", "embed"] = "auto",
         top_k: int = 5,
         source_ids: list[str] = None
     ) -> list[KnowledgeRef]:
         """
-        检索知识
+        Retrieve knowledge
 
         Args:
-            query: 查询文本
-            method: 检索方式 (auto/bm25/rag-skill/vector)
-            top_k: 返回数量
-            source_ids: 知识源过滤
+            query: Query text
+            method: Retrieval method (auto/bm25/rag-skill/vector/embed)
+            top_k: Number of results to return
+            source_ids: Filter by source IDs
         """
-        # 自动选择最优方式
+        # Auto select best method
         if method == "auto":
             method = self._select_best_method(query)
 
         results = []
 
         if method == "rag-skill":
-            # rag-skill 风格检索
+            # rag-skill style retrieval
             results = self.rag_skill_retriever.retrieve(query, top_k)
         elif method == "bm25":
-            # BM25 检索
+            # BM25 retrieval
             results = self.bm25_retriever.retrieve(query, top_k)
         elif method == "vector":
-            # 向量检索
+            # Legacy vector retrieval
             results = self.vector_retriever.retrieve(query, top_k)
+        elif method == "embed":
+            # SQLite + bge-small-zh vector retrieval
+            results = self._retrieve_from_vector_store(query, top_k, source_ids)
 
-        # 来源过滤
+        # Source filtering
         if source_ids:
             results = [r for r in results if r.source_id in source_ids]
 
         return results
 
+    def _retrieve_from_vector_store(
+        self,
+        query: str,
+        top_k: int = 5,
+        source_ids: list[str] = None
+    ) -> list[KnowledgeRef]:
+        """Retrieve from vector store (SQLite + bge-small-zh)"""
+        # Use hybrid search for better results
+        results = self.vector_store.search_hybrid(
+            query=query,
+            top_k=top_k,
+            source_type="knowledge",
+            source_id=source_ids[0] if source_ids and len(source_ids) == 1 else None,
+        )
+
+        # Convert to KnowledgeRef
+        return [
+            KnowledgeRef(
+                source_id=r.get("source_id", "embed"),
+                source_name=r["metadata"].get("source_name", r["source_type"]),
+                content=r["content"],
+                file_path=r["metadata"].get("file_path"),
+                score=r["final_score"] if "final_score" in r else r["score"],
+            )
+            for r in results
+        ]
+
     def _select_best_method(self, query: str) -> str:
-        """自动选择最优检索方式"""
-        # 检查知识目录是否存在
+        """Auto select best retrieval method"""
+        # Check if vector store has data
+        if self.vector_store.count(source_type="knowledge") > 0:
+            # Use embed (SQLite + bge-small-zh) for better semantic understanding
+            return "embed"
+
+        # Check if knowledge directory exists
         knowledge_dir = self.workspace_dir / "knowledge"
         if knowledge_dir.exists() and (knowledge_dir / "data_structure.md").exists():
-            # 有目录结构，使用 rag-skill
+            # Use rag-skill if directory structure exists
             return "rag-skill"
 
-        # 否则使用 BM25
+        # Otherwise use BM25
         return "bm25"
 
     def retrieve_all_methods(
