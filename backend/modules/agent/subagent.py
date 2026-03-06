@@ -1,12 +1,16 @@
 """Subagent Manager - 子 Agent 管理"""
 
 import asyncio
+import json
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any
-
+from pathlib import Path
+from typing import Any, Optional
+from collections import deque
 from loguru import logger
+
+from backend.modules.agent.subagent_types import SubagentType, SubagentDefaults
 
 
 class TaskStatus(Enum):
@@ -28,11 +32,16 @@ class SubagentTask:
         label: str,
         message: str,
         session_id: str | None = None,
+        subagent_type: SubagentType = SubagentType.GENERAL,
+        timeout: int = None,
     ):
         self.task_id = task_id
         self.label = label
         self.message = message
         self.session_id = session_id
+        self.subagent_type = subagent_type
+        self.timeout = timeout or SubagentDefaults.get_timeout(subagent_type)
+
         self.status = TaskStatus.PENDING
         self.progress = 0
         self.result: str | None = None
@@ -41,6 +50,46 @@ class SubagentTask:
         self.started_at: datetime | None = None
         self.completed_at: datetime | None = None
 
+        # 扩展字段
+        self.tool_calls: list[dict] = []
+        self.events: list[dict] = deque(maxlen=100)  # 保留最近100个事件
+
+    def add_event(self, event_type: str, details: dict = None):
+        """添加任务事件"""
+        event = {
+            "type": event_type,
+            "timestamp": datetime.now().isoformat(),
+            "details": details or {},
+        }
+        self.events.append(event)
+
+    def add_tool_call(self, tool_name: str, args: dict, result: str = None):
+        """记录工具调用"""
+        self.tool_calls.append({
+            "tool": tool_name,
+            "args": args,
+            "result": result,
+            "timestamp": datetime.now().isoformat(),
+        })
+
+    @property
+    def duration(self) -> Optional[float]:
+        """任务执行时长（秒）"""
+        if self.started_at:
+            end = self.completed_at or datetime.now()
+            return (end - self.started_at).total_seconds()
+        return None
+
+    @property
+    def metrics(self) -> dict:
+        """任务指标"""
+        return {
+            "duration_seconds": self.duration,
+            "tool_calls": len(self.tool_calls),
+            "errors": 1 if self.error else 0,
+            "output_length": len(self.result) if self.result else 0,
+        }
+
     def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
@@ -48,6 +97,8 @@ class SubagentTask:
             "label": self.label,
             "message": self.message,
             "session_id": self.session_id,
+            "subagent_type": self.subagent_type.value,
+            "timeout": self.timeout,
             "status": self.status.value,
             "progress": self.progress,
             "result": self.result,
@@ -55,35 +106,53 @@ class SubagentTask:
             "created_at": self.created_at.isoformat(),
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "duration": self.duration,
+            "metrics": self.metrics,
+            "tool_calls": self.tool_calls,
+            "events": list(self.events),
         }
 
 
 class SubagentManager:
     """
     子 Agent 管理器
-    
+
     管理后台任务的创建、执行、取消和状态查询
     """
 
-    def __init__(self, provider, workspace, model: str, temperature: float = 0.7, max_tokens: int = 4096):
+    def __init__(
+        self,
+        provider,
+        workspace,
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        global_timeout: int = 600,
+        max_concurrent: int = 3,
+    ):
         """
         初始化 SubagentManager
-        
+
         Args:
             provider: LLM Provider 实例
             workspace: 工作空间路径
             model: 模型名称
             temperature: 温度参数
             max_tokens: 最大 token 数
+            global_timeout: 全局超时时间（秒）
+            max_concurrent: 最大并发任务数
         """
         self.provider = provider
         self.workspace = workspace
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.global_timeout = global_timeout
+        self.max_concurrent = max_concurrent
+
         self.tasks: dict[str, SubagentTask] = {}
         self.running_tasks: dict[str, asyncio.Task] = {}
-        
+
         logger.debug("SubagentManager initialized")
 
     def create_task(
@@ -91,30 +160,37 @@ class SubagentManager:
         label: str,
         message: str,
         session_id: str | None = None,
+        subagent_type: SubagentType = SubagentType.GENERAL,
+        timeout: int = None,
     ) -> str:
         """
         创建新的后台任务
-        
+
         Args:
             label: 任务标签
             message: 任务消息
             session_id: 关联的会话 ID (可选)
-            
+            subagent_type: 子代理类型
+            timeout: 超时时间（秒），默认使用类型默认值
+
         Returns:
             str: 任务 ID
         """
         task_id = str(uuid.uuid4())
-        
+
         task = SubagentTask(
             task_id=task_id,
             label=label,
             message=message,
             session_id=session_id,
+            subagent_type=subagent_type,
+            timeout=timeout,
         )
-        
+
         self.tasks[task_id] = task
-        logger.info(f"Created task {task_id}: {label}")
-        
+        task.add_event("created", {"label": label, "type": subagent_type.value})
+        logger.info(f"Created task {task_id}: {label} (type: {subagent_type.value})")
+
         return task_id
 
     async def execute_task(self, task_id: str) -> None:
