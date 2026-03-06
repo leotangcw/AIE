@@ -158,26 +158,33 @@ class RAGSkillRetriever:
 
     def _find_related_dirs(self, structure: str, query: str) -> list[Path]:
         """查找相关目录"""
-        query_keywords = set(query.lower().split())
+        query_lower = query.lower()
         related = []
 
         lines = structure.split("\n")
         for line in lines:
-            # 查找目录或标题
-            if "##" in line or "###" in line:
-                dir_name = line.replace("#", "").strip()
-                if query_keywords & set(dir_name.lower().split()):
-                    # 尝试找到对应的目录
-                    dir_path = self.knowledge_dir / dir_name
-                    if dir_path.exists():
-                        related.append(dir_path)
+            # 查找标题（支持 # 到 ###）
+            if "#" in line:
+                title = line.replace("#", "").strip()
+                # Use substring matching for Chinese support
+                if query_lower in title.lower():
+                    # 尝试找到对应的目录（标题中的关键词作为目录名）
+                    # 对于"知识库目录结构"这样的标题，搜索 knowledge 目录下的子目录
+                    for item in self.knowledge_dir.iterdir():
+                        if item.is_dir() and query_lower in item.name.lower():
+                            related.append(item)
+                    # 如果标题本身就是目录结构说明，搜索所有子目录
+                    if "结构" in title or "structure" in title.lower():
+                        for item in self.knowledge_dir.iterdir():
+                            if item.is_dir() and item not in related:
+                                related.append(item)
 
         return related[:3]
 
     def _search_directory(self, dir_path: Path, query: str, limit: int) -> list[KnowledgeRef]:
         """搜索目录"""
         results = []
-        query_keywords = query.lower().split()
+        query_lower = query.lower()
 
         # 搜索 Markdown 文件
         for md_file in dir_path.rglob("*.md"):
@@ -186,12 +193,12 @@ class RAGSkillRetriever:
 
             try:
                 content = md_file.read_text(encoding="utf-8")
-                # 简单关键词匹配
-                if any(kw in content.lower() for kw in query_keywords):
+                # Substring matching for Chinese support
+                if query_lower in content.lower():
                     # 查找匹配的行
                     lines = content.split("\n")
                     for i, line in enumerate(lines):
-                        if any(kw in line.lower() for kw in query_keywords):
+                        if query_lower in line.lower():
                             # 提取上下文
                             start = max(0, i - 3)
                             end = min(len(lines), i + 4)
@@ -217,7 +224,7 @@ class RAGSkillRetriever:
     def _direct_search(self, query: str, limit: int) -> list[KnowledgeRef]:
         """直接搜索"""
         results = []
-        query_keywords = query.lower().split()
+        query_lower = query.lower()
 
         for md_file in self.knowledge_dir.rglob("*.md"):
             if md_file.name == "data_structure.md":
@@ -225,26 +232,25 @@ class RAGSkillRetriever:
 
             try:
                 content = md_file.read_text(encoding="utf-8")
-                if any(kw in content.lower() for kw in query_keywords):
-                    # 简单返回文件的前几段
-                            content = md_file.read_text(encoding="utf-8")
-                            # 找到第一个匹配位置
-                            idx = min(content.lower().find(kw) for kw in query_keywords if kw in content.lower())
-                            # 提取附近内容
-                            start = max(0, idx - 200)
-                            end = min(len(content), idx + 500)
-                            context = content[start:end]
+                # Substring matching for Chinese support
+                if query_lower in content.lower():
+                    # 找到第一个匹配位置
+                    idx = content.lower().find(query_lower)
+                    # 提取附近内容
+                    start = max(0, idx - 200)
+                    end = min(len(content), idx + 500)
+                    context = content[start:end]
 
-                            results.append(KnowledgeRef(
-                                source_id="local",
-                                source_name=str(md_file.relative_to(self.knowledge_dir)),
-                                content=context,
-                                file_path=str(md_file),
-                                score=0.8
-                            ))
+                    results.append(KnowledgeRef(
+                        source_id="local",
+                        source_name=str(md_file.relative_to(self.knowledge_dir)),
+                        content=context,
+                        file_path=str(md_file),
+                        score=0.8
+                    ))
 
-                            if len(results) >= limit:
-                                return results
+                    if len(results) >= limit:
+                        return results
             except Exception:
                 pass
 
@@ -398,7 +404,11 @@ class KnowledgeRAG:
         self.chunks_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize retrievers
-        self.rag_skill_retriever = RAGSkillRetriever(self.workspace_dir / "knowledge")
+        # Initialize retrievers (check both possible knowledge directories)
+        knowledge_dir = self.workspace_dir / "knowledge"
+        if not knowledge_dir.exists():
+            knowledge_dir = self.workspace_dir / "workspace" / "knowledge"
+        self.rag_skill_retriever = RAGSkillRetriever(knowledge_dir)
         self.bm25_retriever = BM25Retriever()
         self.vector_retriever = VectorRetriever()
 
