@@ -1,0 +1,164 @@
+# Claude Code Agent Workflow
+# Claude Code 智能体工作流 - 自动化代码生成和审查
+
+name: Claude Code Agent
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Task description for Claude Code"
+        required: true
+        type: string
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  # ===========================================
+  # Claude Code 任务分析
+  # ===========================================
+  analyze-task:
+    name: Analyze Task
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude-code'))
+    outputs:
+      task_description: ${{ steps.extract.outputs.description }}
+    steps:
+      - name: Extract task description
+        id: extract
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "description=${{ inputs.task }}" >> $GITHUB_OUTPUT
+          else
+            echo "description=${{ github.event.comment.body }}" >> $GITHUB_OUTPUT
+          fi
+
+  # ===========================================
+  # 代码审查辅助
+  # ===========================================
+  pr-review-assist:
+    name: PR Review Assistant
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed
+        uses: tj-actions/changed-files@v41
+        with:
+          files: |
+            backend/**/*.py
+            frontend/**/*.ts
+            frontend/**/*.vue
+
+      - name: Analyze changes
+        run: |
+          echo "## 📝 PR Changes Summary" > $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Modified Files" >> $GITHUB_STEP_SUMMARY
+
+          for file in ${{ steps.changed.outputs.all_modified_files }}; do
+            echo "- \`$file\`" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - name: Check for TODO comments
+        run: |
+          echo "### TODO Comments Found" >> $GITHUB_STEP_SUMMARY
+          grep -rn "TODO\|FIXME\|XXX" --include="*.py" --include="*.ts" --include="*.vue" backend/ frontend/ 2>/dev/null | head -10 >> $GITHUB_STEP_SUMMARY || echo "No TODO comments" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate PR summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = process.env.SUMMARY || 'No summary generated';
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 🤖 Claude Code PR Assistant\n\n${summary}`
+            }).catch(() => {});
+
+  # ===========================================
+  # 自动生成 changelog
+  # ===========================================
+  auto-changelog:
+    name: Auto Changelog
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog entry
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+
+          # Extract commit type from PR title
+          if [[ "$PR_TITLE" =~ ^feat: ]]; then
+            TYPE="🎉 Feature"
+          elif [[ "$PR_TITLE" =~ ^fix: ]]; then
+            TYPE="🐛 Bug Fix"
+          elif [[ "$PR_TITLE" =~ ^docs: ]]; then
+            TYPE="📚 Documentation"
+          elif [[ "$PR_TITLE" =~ ^refactor: ]]; then
+            TYPE="♻️ Refactor"
+          elif [[ "$PR_TITLE" =~ ^test: ]]; then
+            TYPE="✅ Test"
+          elif [[ "$PR_TITLE" =~ ^chore: ]]; then
+            TYPE="🔧 Chore"
+          else
+            TYPE="📝 Other"
+          fi
+
+          echo "## $TYPE" > changelog_entry.md
+          echo "- $PR_TITLE (#$PR_NUMBER) by @$PR_AUTHOR" >> changelog_entry.md
+          cat changelog_entry.md
+
+      - name: Upload changelog entry
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-entry
+          path: changelog_entry.md
+          retention-days: 30
+
+  # ===========================================
+  # 依赖更新检查
+  # ===========================================
+  dependency-check:
+    name: Dependency Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pip-review
+        run: pip install pip-review
+
+      - name: Check for outdated dependencies
+        run: |
+          echo "## 📦 Outdated Dependencies" > $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          pip-review --local 2>/dev/null | head -20 >> $GITHUB_STEP_SUMMARY || echo "No outdated dependencies found" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

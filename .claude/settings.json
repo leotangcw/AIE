@@ -1,0 +1,35 @@
+{
+  "default_instructions": {
+    "language": "zh-CN",
+    "tone": "professional",
+    "code_style": {
+      "python": {
+        "formatter": "black",
+        "line_length": 100,
+        "type_hints": true
+      },
+      "typescript": {
+        "strict": true
+      }
+    }
+  },
+  "project_info": {
+    "name": "AIE (AI Employee)",
+    "description": "企业级 AI 办公助手",
+    "tech_stack": ["Python", "FastAPI", "Vue3", "TypeScript", "SQLite/PostgreSQL"],
+    "modules": [
+      "agent",
+      "channels",
+      "tools",
+      "providers",
+      "memory",
+      "skills"
+    ]
+  },
+  "development_workflow": {
+    "branch_naming": "feat/{module}/{description}",
+    "commit_style": "conventional",
+    "test_required": true,
+    "code_review": true
+  }
+}

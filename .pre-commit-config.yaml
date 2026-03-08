@@ -1,0 +1,87 @@
+# Pre-commit Hooks for AIE
+# 预提交钩子配置 - 自动代码检查
+
+repos:
+  # ===========================================
+  # Python 代码格式化
+  # ===========================================
+  - repo: https://github.com/psf/black
+    rev: 24.2.0
+    hooks:
+      - id: black
+        name: Black Formatter
+        args: ["--line-length", "100"]
+        files: ^backend/.*\.py$
+
+  # ===========================================
+  # Python 导入排序
+  # ===========================================
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort Imports
+        args: ["--profile", "black", "--line-length", "100"]
+        files: ^backend/.*\.py$
+
+  # ===========================================
+  # Python 代码风格检查
+  # ===========================================
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        name: flake8 Linter
+        args: ["--config=.flake8"]
+        files: ^backend/.*\.py$
+        additional_dependencies:
+          - flake8-bugbear
+          - flake8-isort
+
+  # ===========================================
+  # Python 类型检查
+  # ===========================================
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: mypy Type Checker
+        args: ["--ignore-missing-imports", "--no-strict-optional"]
+        files: ^backend/.*\.py$
+        pass_filenames: false
+
+  # ===========================================
+  # 敏感信息检测
+  # ===========================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim Trailing Whitespace
+      - id: end-of-file-fixer
+        name: Fix End of Files
+      - id: detect-private-key
+        name: Detect Private Keys
+      - id: detect-aws-credentials
+        name: Detect AWS Credentials
+        args: ["--allow-missing-credentials"]
+
+  # ===========================================
+  # YAML 格式检查
+  # ===========================================
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        name: YAML Linter
+        files: \.(yaml|yml)$
+
+  # ===========================================
+  # 大型文件检测
+  # ===========================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        name: Check for large files
+        args: ["--maxkb=1000"]

@@ -1,0 +1,78 @@
+# Dependencies Watcher
+# 自动检查依赖更新的 GitHub Actions
+
+name: Dependencies
+
+on:
+  schedule:
+    # 每周日运行
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  # ===========================================
+  # Python 依赖检查
+  # ===========================================
+  check-python-deps:
+    name: Check Python Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-review
+        run: pip install pip-review
+
+      - name: Check for outdated dependencies
+        run: |
+          echo "## 📦 Outdated Python Dependencies" > $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          pip-review --local 2>&1 | head -50 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Create issue for outdated dependencies
+        uses: peter-evans/create-issue-from-file@v4
+        with:
+          title: 📦 Update Python Dependencies
+          content-filepath: $GITHUB_STEP_SUMMARY
+          labels: dependencies,python
+
+  # ===========================================
+  # Node.js 依赖检查
+  # ===========================================
+  check-node-deps:
+    name: Check Node.js Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install npm-check-updates
+        run: npm install -g npm-check-updates
+
+      - name: Check for outdated dependencies
+        working-directory: frontend
+        run: |
+          echo "## 📦 Outdated Node.js Dependencies" > $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ncu 2>&1 | head -50 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Create issue for outdated dependencies
+        uses: peter-evans/create-issue-from-file@v4
+        with:
+          title: 📦 Update Node.js Dependencies
+          content-filepath: $GITHUB_STEP_SUMMARY
+          labels: dependencies,frontend
