@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(C:/Users/y00842095/Desktop/job/AIE/docker/README.md:*)"
+    ]
+  }
+}

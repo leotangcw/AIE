@@ -1,0 +1,50 @@
+name: PR Labeler
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  # ===========================================
+  # 自动标签
+  # ===========================================
+  auto-label:
+    name: Auto Label PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Add labels based on PR content
+        uses: actions/labeler@v5
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          configuration-path: .github/labeler.yml
+
+  # ===========================================
+  # 欢迎首次贡献者
+  # ===========================================
+  welcome-first-time:
+    name: Welcome First Time Contributors
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.association == 'FIRST_TIME_CONTRIBUTOR'
+    steps:
+      - name: Post welcome comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `👋 欢迎 @${{ github.event.pull_request.user.login }} 首次贡献 AIE 项目!
+
+              感谢你的贡献！我们会尽快审查这个 PR。
+
+              在等待审查期间，你可以：
+              - 查看 [贡献指南](CONTRIBUTING.md)
+              - 查看其他 [open issues](https://github.com/${{ github.repository }}/issues)
+
+              如有任何问题，欢迎在 PR 中留言或联系维护者。
+              `
+            })

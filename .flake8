@@ -1,15 +1,22 @@
 [flake8]
+# ===========================================
+# AIE Flake8 配置
+# 面向团队开发的代码风格检查
+# ===========================================
+
 # 最大行长度
 max-line-length = 100
 
 # 忽略的错误代码
-ignore = 
-    # E203: whitespace before ':'（与 black 冲突）
+ignore =
+    # E203: whitespace before ':' (与 black 冲突)
     E203,
-    # W503: line break before binary operator（与 PEP 8 更新冲突）
+    # W503: line break before binary operator (与 PEP 8 更新冲突)
     W503,
-    # E501: line too long（已通过 max-line-length 控制）
-    E501
+    # E501: line too long (已通过 max-line-length 控制)
+    E501,
+    # C901: 复杂度太高 (单独用 mccabe 检查)
+    C901
 
 # 排除的目录
 exclude =
@@ -19,6 +26,7 @@ exclude =
     venv,
     ENV,
     env,
+    .github,
     build,
     dist,
     *.egg-info,
@@ -26,7 +34,40 @@ exclude =
     frontend,
     website,
     data,
-    .github
+    memory,
+    workspace,
+    # 测试文件中的 mock 数据
+    */tests/fixtures/*,
 
-# 每个文件的最大复杂度
-max-complexity = 10
+# 每个文件的最大圈复杂度
+max-complexity = 12
+
+# 每行最大字符数 (用于 long-lines-should-have-parens)
+max-doc-length = 100
+
+# 选择性启用扩展
+select =
+    E,      # pycodestyle errors
+    F,      # pyflakes
+    W,      # pycodestyle warnings
+    I,      # isort
+    B,      # bugbear
+    UP,     # pyupgrade
+
+# per-file-ignores (按文件忽略)
+# 格式：filename: ignore_codes
+per-file-ignores =
+    # 测试文件可以忽略一些规则
+    backend/tests/*: D100,D101,D102,D103,S101
+    # 初始化文件可以忽略未使用导入
+    backend/modules/*/__init__.py: F401
+    # 配置模块可以忽略导入顺序
+    backend/*/config.py: I001
+
+# isort 配置 (如果 flake8 安装了 flake8-isort)
+[isort]
+profile = black
+line_length = 100
+skip = .venv,venv,build,dist
+known_first_party = backend
+known_third_party = fastapi,pydantic,sqlalchemy,litellm

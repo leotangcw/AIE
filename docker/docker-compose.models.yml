@@ -1,0 +1,164 @@
+# AIE 模型部署 Docker Compose
+# 支持部署本地 LLM 模型（Ollama、LocalAI 等）
+
+version: '3.8'
+
+services:
+  # ===========================================
+  # Ollama - 本地模型运行
+  # ===========================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: aie-ollama
+    profiles:
+      - models
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - aie-network
+
+  # 拉取模型初始化
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: aie-ollama-init
+    profiles:
+      - models
+    depends_on:
+      - ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_MODELS: ${OLLAMA_MODELS:-qwen2.5:7b llama3.2:3b}
+    command: >
+      sh -c "
+        echo '等待 Ollama 启动...' &&
+        sleep 10 &&
+        for model in \$OLLAMA_MODELS; do
+          echo '拉取模型：\$\$model'
+          ollama pull \$\$model
+        done &&
+        echo '模型拉取完成!'
+      "
+    networks:
+      - aie-network
+
+  # ===========================================
+  # LocalAI - 兼容 OpenAI API 的本地模型
+  # ===========================================
+  localai:
+    image: localai/localai:latest-gpu
+    container_name: aie-localai
+    profiles:
+      - models
+    volumes:
+      - localai_models:/models
+    ports:
+      - "${LOCALAI_PORT:-8080}:8080"
+    environment:
+      MODE_PATH: /models
+      MODELS: ${LOCALAI_MODELS:-ggml-gpt4all-j}
+      THREADS: ${LOCALAI_THREADS:-4}
+      CONTEXT_SIZE: ${LOCALAI_CONTEXT_SIZE:-512}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - aie-network
+
+  # ===========================================
+  # FastChat - 多模型服务框架
+  # ===========================================
+  fastchat-controller:
+    image: lmsys/fastchat:latest
+    container_name: aie-fastchat-controller
+    profiles:
+      - models
+    ports:
+      - "21001:21001"
+    volumes:
+      - fastchat_models:/data/models
+    command:
+      - "--model-names"
+      - "${FASTCHAT_MODELS:-vicuna-7b}"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - aie-network
+
+  # ===========================================
+  # AIE 后端（连接本地模型）
+  # ===========================================
+  backend-local:
+    build:
+      context: ..
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: aie-backend-local
+    profiles:
+      - models
+    depends_on:
+      - ollama
+    environment:
+      # 使用本地 Ollama
+      LLM_PROVIDER: ollama
+      LLM_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b}
+      OLLAMA_BASE_URL: http://ollama:11434
+
+      # 数据库配置
+      DATABASE_URL: postgresql+asyncpg://aie:aie_password@postgres:5432/aie
+      REDIS_URL: redis://redis:6379
+
+      # 应用配置
+      APP_ENV: production
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    restart: unless-stopped
+    networks:
+      - aie-network
+
+# ===========================================
+# 网络配置
+# ===========================================
+networks:
+  aie-network:
+    driver: bridge
+    name: aie-network
+
+# ===========================================
+# 数据卷配置
+# ===========================================
+volumes:
+  ollama_data:
+    name: aie-ollama-data
+  localai_models:
+    name: aie-localai-models
+  fastchat_models:
+    name: aie-fastchat-models
