@@ -79,7 +79,7 @@ def get_db_session_factory():
 async def init_db() -> None:
     """初始化数据库"""
     # 导入所有模型以确保表被创建
-    from backend.models import CronJob, Message, Personality, Session, Setting, Task, ToolConversation  # noqa: F401
+    from backend.models import AgentTeam, CronJob, Message, Personality, Session, Setting, Task, ToolConversation  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
