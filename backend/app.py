@@ -366,6 +366,7 @@ from backend.api.security import router as security_router
 from backend.api.knowledge import router as knowledge_router
 from backend.api.research import router as research_router
 from backend.api.plugins import router as plugins_router
+from backend.api.agent_teams import router as agent_teams_router
 
 app.include_router(auth_router)
 app.include_router(chat_router)
@@ -386,6 +387,7 @@ app.include_router(security_router)
 app.include_router(knowledge_router)
 app.include_router(research_router)
 app.include_router(plugins_router)
+app.include_router(agent_teams_router)
 
 
 # WebSocket 端点
