@@ -187,7 +187,6 @@ class AppConfig(BaseModel):
                     )
                 elif provider_id == "qwen":
                     # 阿里云百炼 Coding Plan 默认配置
-                    # TODO: 在此填写你的 API Key，或设置环境变量 QWEN_API_KEY
                     self.providers[provider_id] = ProviderConfig(
                         api_key="",
                         api_base="https://coding.dashscope.aliyuncs.com/v1",
