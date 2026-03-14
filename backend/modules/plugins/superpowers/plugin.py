@@ -5,7 +5,12 @@
 - 任务规划 (planning)
 - 调试 (debugging)
 - 代码审查 (code_review)
+- 接收代码审查反馈 (receiving-code-review)
 - 验证 (verification)
+- 测试驱动开发 (test-driven-development)
+- 完成开发分支 (finishing-a-development-branch)
+- Git Worktrees (using-git-worktrees)
+- 子代理驱动开发 (subagent-driven-development)
 """
 
 from typing import Any
@@ -18,8 +23,8 @@ class SuperpowersPlugin(Plugin):
     """Superpowers 开发流程插件"""
 
     name = "superpowers"
-    version = "1.0.0"
-    description = "开发流程工具：头脑风暴、计划、调试、审查、验证等"
+    version = "2.1.0"
+    description = "开发流程工具：头脑风暴、计划、调试、审查、验证、TDD、Git Worktree等"
     author = "AIE Team"
     enabled_by_default = False  # 默认关闭，可手动开启
 
@@ -37,7 +42,12 @@ class SuperpowersPlugin(Plugin):
         from .planning import PlanningSkill
         from .debugging import DebuggingSkill
         from .code_review import CodeReviewSkill
+        from .receiving_code_review import ReceivingCodeReviewSkill
         from .verification import VerificationSkill
+        from .tdd import TDDSkill
+        from .finishing_branch import FinishingBranchSkill
+        from .git_worktree import GitWorktreeSkill
+        from .subagent_dev import SubagentDevSkill
 
         # 初始化各个技能
         self._skills = {
@@ -45,7 +55,12 @@ class SuperpowersPlugin(Plugin):
             "planning": PlanningSkill(),
             "debugging": DebuggingSkill(),
             "code_review": CodeReviewSkill(),
+            "receiving-code-review": ReceivingCodeReviewSkill(),
             "verification": VerificationSkill(),
+            "test-driven-development": TDDSkill(),
+            "finishing-a-development-branch": FinishingBranchSkill(),
+            "using-git-worktrees": GitWorktreeSkill(),
+            "subagent-driven-development": SubagentDevSkill(),
         }
 
         self._initialized = True
