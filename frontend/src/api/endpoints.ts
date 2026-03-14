@@ -600,3 +600,75 @@ export const stopAPI = {
     getActiveTasks: (): Promise<{ active_tasks: string[]; count: number }> =>
         queueAPI.getActiveTasks(),
 }
+
+// ============================================================================
+// Task Board API - 任务看板
+// ============================================================================
+
+// Task Item 类型
+export interface TaskItem {
+    id: string
+    title: string
+    description?: string
+    task_scope: 'system' | 'session'
+    session_id?: string
+    task_type: 'manual' | 'workflow' | 'subagent' | 'cron'
+    parent_id?: string
+    cron_id?: string
+    cron_expression?: string
+    next_run_at?: string
+    last_run_status?: string
+    last_run_at?: string
+    status: 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
+    progress: number
+    started_at?: string
+    completed_at?: string
+    estimated_duration?: number
+    actual_duration?: number
+    error_message?: string
+    retry_count: number
+    max_retries: number
+    created_at?: string
+    updated_at?: string
+}
+
+export interface TaskBoardResponse {
+    system_tasks: TaskItem[]
+    running_tasks: TaskItem[]
+    done_tasks: TaskItem[]
+}
+
+// Task Board API
+export const taskBoardAPI = {
+    // 获取系统级周期任务
+    getSystemTasks: (): Promise<{ tasks: TaskItem[] }> =>
+        apiClient.get('/task-items/system'),
+
+    // 获取会话任务看板
+    getSessionTasks: (sessionId: string): Promise<TaskBoardResponse> =>
+        apiClient.get(`/task-items/session/${sessionId}`),
+
+    // 获取会话进行中的任务
+    getRunningTasks: (sessionId: string): Promise<{ tasks: TaskItem[] }> =>
+        apiClient.get(`/task-items/session/${sessionId}/running`),
+
+    // 获取会话已完成的任务
+    getDoneTasks: (sessionId: string, limit?: number): Promise<{ tasks: TaskItem[] }> =>
+        apiClient.get(`/task-items/session/${sessionId}/done`, { params: { limit } }),
+
+    // 获取任务详情
+    getTask: (taskId: string): Promise<{ task: TaskItem }> =>
+        apiClient.get(`/task-items/${taskId}`),
+
+    // 刷新任务进度（使用模型主动检查）
+    refreshTask: (taskId: string): Promise<{
+        task_id: string
+        status: string
+        progress: number
+        description: string
+    }> => apiClient.post(`/task-items/${taskId}/refresh`),
+
+    // 获取子任务
+    getSubtasks: (taskId: string): Promise<{ tasks: TaskItem[] }> =>
+        apiClient.get(`/task-items/${taskId}/subtasks`),
+}
