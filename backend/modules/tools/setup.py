@@ -103,8 +103,11 @@ def register_all_tools(
     if subagent_manager is not None:
         try:
             from backend.modules.tools.spawn import SpawnTool
-            
+
             spawn_tool = SpawnTool(subagent_manager)
+            # 设置当前会话 ID（用于任务追踪）
+            if session_id:
+                spawn_tool.set_context(session_id)
             tools.register(spawn_tool)
             logger.debug("Registered spawn tool")
         except Exception as e:

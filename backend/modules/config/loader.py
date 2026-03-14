@@ -1,6 +1,7 @@
 """配置加载器"""
 
 import json
+import os
 from typing import Any
 
 from loguru import logger
@@ -11,11 +12,34 @@ from backend.models.setting import Setting
 from backend.modules.config.schema import AppConfig
 
 
+# API Key 环境变量映射
+ENV_API_KEYS = {
+    "qwen": "QWEN_API_KEY",
+    "zhipu": "ZHIPU_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
+    "moonshot": "MOONSHOT_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "groq": "GROQ_API_KEY",
+}
+
+
 class ConfigLoader:
     """配置加载器"""
 
     def __init__(self) -> None:
         self.config: AppConfig = AppConfig()
+
+    def _load_api_keys_from_env(self) -> None:
+        """从环境变量加载 API Key"""
+        for provider_name, env_key in ENV_API_KEYS.items():
+            api_key = os.environ.get(env_key, "").strip()
+            if api_key and hasattr(self.config.providers, provider_name):
+                provider_config = getattr(self.config.providers, provider_name)
+                if provider_config and not provider_config.api_key:
+                    provider_config.api_key = api_key
+                    logger.info(f"从环境变量加载 {provider_name} API Key")
 
     async def load(self) -> AppConfig:
         """从数据库加载配置"""
@@ -27,6 +51,8 @@ class ConfigLoader:
 
             if not settings:
                 logger.info("未找到配置，使用默认配置")
+                # 从环境变量加载 API Key
+                self._load_api_keys_from_env()
                 await self.save()
                 return self.config
 
@@ -46,7 +72,10 @@ class ConfigLoader:
                         provider_data["api_key"] = ""
 
             self.config = AppConfig(**config_dict)
-            
+
+            # 从环境变量加载 API Key（优先级最高）
+            self._load_api_keys_from_env()
+
             # 如果启用了加密，解密 API 密钥
             if self.config.security.api_key_encryption_enabled:
                 self._decrypt_api_keys()
