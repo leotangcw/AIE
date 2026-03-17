@@ -71,8 +71,8 @@ class LLMProcessor(BaseProcessor):
         prompt_style = self.config.get("prompt_style", "compress")
 
         # 获取提示词模板
-        from ..config import LLMConfig
-        templates = LLMConfig.PROMPT_STYLES
+        from ..config import PROMPT_STYLES
+        templates = PROMPT_STYLES
 
         template = templates.get(prompt_style, templates["compress"])
 
