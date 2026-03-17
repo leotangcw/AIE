@@ -353,7 +353,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch, inject } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch, inject, h } from 'vue'
 import {
   History as HistoryIcon,
   Wrench as ToolsIcon,
