@@ -44,11 +44,12 @@ class AgentSlot:
 class WorkflowEngine:
     """多智能体工作流引擎 — 编排 Pipeline / Graph / Council 三种执行模式。"""
 
-    def __init__(self, subagent_manager, session_id: str | None = None, cancel_token=None, skills=None) -> None:
+    def __init__(self, subagent_manager, session_id: str | None = None, cancel_token=None, skills=None, task_board_id: str | None = None) -> None:
         self._mgr = subagent_manager
         self._session_id = session_id
         self._cancel_token = cancel_token
         self._skills = skills  # 技能系统实例
+        self._task_board_id = task_board_id  # 任务看板ID
         # 每个 agent 的执行数据（工具调用 + 结论），最终序列化到结果中用于持久化
         self._execution_data: dict[str, dict] = {}
 

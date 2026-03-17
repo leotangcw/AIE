@@ -113,7 +113,8 @@
         "cronTooltip": "Manage scheduled tasks",
         "timelineTooltip": "View message timeline",
         "tasksTooltip": "View task board",
-        "settingsTooltip": "Open settings"
+        "settingsTooltip": "Open settings",
+        "knowledgeHubTooltip": "Knowledge Hub"
     },
     "chat": {
         "title": "Chat",
@@ -329,6 +330,32 @@
             "rules": "Rules",
             "knowledge": "Knowledge",
             "knowledgeHub": "Hub"
+        },
+        "knowledgeHub": {
+            "title": "Knowledge Hub",
+            "description": "Configure enterprise knowledge retrieval and processing",
+            "processingMode": "Processing Mode",
+            "directMode": "Direct",
+            "llmMode": "LLM Enhanced",
+            "hybridMode": "Hybrid",
+            "llmConfig": "LLM Config",
+            "enableLLM": "Enable LLM Processing",
+            "promptStyle": "Prompt Style",
+            "styleCompress": "Compress",
+            "styleRestate": "Restate",
+            "styleRework": "Rework",
+            "model": "Model",
+            "temperature": "Temperature",
+            "maxTokens": "Max Tokens",
+            "cache": "Cache",
+            "enableCache": "Enable Cache",
+            "cacheTTL": "Cache TTL",
+            "refreshCache": "Refresh Cache",
+            "testRetrieve": "Test Retrieval",
+            "queryPlaceholder": "Enter search query...",
+            "searching": "Searching...",
+            "search": "Search",
+            "cacheRefreshed": "Cache refreshed"
         },
         "saveSuccess": "Settings saved successfully",
         "saveError": "Failed to save settings",

@@ -115,7 +115,8 @@
         "tasksTooltip": "查看任务看板",
         "cronTooltip": "管理定时任务",
         "timelineTooltip": "查看消息时间轴",
-        "settingsTooltip": "打开设置"
+        "settingsTooltip": "打开设置",
+        "knowledgeHubTooltip": "知识中枢"
     },
     "chat": {
         "title": "聊天",
@@ -356,6 +357,32 @@
             "rules": "规则",
             "knowledge": "知识",
             "knowledgeHub": "中枢"
+        },
+        "knowledgeHub": {
+            "title": "知识中枢",
+            "description": "配置企业知识检索和处理模式",
+            "processingMode": "处理模式",
+            "directMode": "直接检索",
+            "llmMode": "LLM加工",
+            "hybridMode": "混合模式",
+            "llmConfig": "LLM配置",
+            "enableLLM": "启用LLM加工",
+            "promptStyle": "提示词风格",
+            "styleCompress": "信息压缩",
+            "styleRestate": "关键复述",
+            "styleRework": "加工改写",
+            "model": "模型",
+            "temperature": "温度",
+            "maxTokens": "最大输出",
+            "cache": "缓存设置",
+            "enableCache": "启用缓存",
+            "cacheTTL": "缓存有效期",
+            "refreshCache": "刷新缓存",
+            "testRetrieve": "测试检索",
+            "queryPlaceholder": "输入检索关键词...",
+            "searching": "搜索中...",
+            "search": "搜索",
+            "cacheRefreshed": "缓存已刷新"
         },
         "saveSuccess": "设置保存成功",
         "saveError": "保存设置失败",

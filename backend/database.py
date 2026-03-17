@@ -79,11 +79,24 @@ def get_db_session_factory():
 async def init_db() -> None:
     """初始化数据库"""
     # 导入所有模型以确保表被创建
-    from backend.models import AgentTeam, CronJob, Message, Personality, Session, Setting, Task, ToolConversation  # noqa: F401
+    from backend.models import AgentTeam, CronJob, Message, Personality, Session, Setting, Task, TaskItem, ToolConversation  # noqa: F401
+    from sqlalchemy import text
 
     async with engine.begin() as conn:
+        # 创建所有不存在的表
         await conn.run_sync(Base.metadata.create_all)
-    
+
+        # 检查并确保 task_items 表存在（兼容已有数据库）
+        try:
+            result = await conn.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='task_items'"))
+            tables = result.fetchall()
+            if not tables:
+                logger.info("Creating missing task_items table...")
+                await conn.run_sync(Base.metadata.tables['task_items'].create)
+                logger.info("task_items table created successfully")
+        except Exception as e:
+            logger.warning(f"Could not check for task_items table: {e}")
+
     # 初始化性格数据
     await init_personalities()
 

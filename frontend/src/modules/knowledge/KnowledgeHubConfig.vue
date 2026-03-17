@@ -16,7 +16,7 @@
             :value="mode.value"
             @change="updateConfig"
           />
-          <span class="mode-label">{{ mode.label }}</span>
+          <span class="mode-label">{{ $t(mode.labelKey) }}</span>
         </label>
       </div>
     </div>
@@ -135,9 +135,9 @@ const config = ref<KnowledgeHubConfig>({
 })
 
 const modes = [
-  { value: 'direct', label: '直接检索' },
-  { value: 'llm', label: 'LLM加工' },
-  { value: 'hybrid', label: '混合模式' }
+  { value: 'direct', labelKey: 'knowledgeHub.directMode' },
+  { value: 'llm', labelKey: 'knowledgeHub.llmMode' },
+  { value: 'hybrid', labelKey: 'knowledgeHub.hybridMode' }
 ]
 
 const testQuery = ref('')

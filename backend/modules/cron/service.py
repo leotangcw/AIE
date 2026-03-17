@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.cron_job import CronJob
 from backend.modules.cron.types import CronJobInfo, JobExecutionResult, CronSchedule
+from backend.modules.agent.task_board import TaskBoardService
 from backend.utils.logger import logger
 
 # 北京时区 UTC+8
@@ -58,9 +59,23 @@ class CronService:
         self.db.add(job)
         await self.db.commit()
         await self.db.refresh(job)
-        
+
+        # 同步创建任务看板项
+        try:
+            task_service = TaskBoardService(self.db)
+            await task_service.create_system_task(
+                title=name,
+                task_type="cron",
+                cron_id=job.id,
+                cron_expression=schedule,
+                description=message,
+            )
+            logger.info(f"[TaskBoard] Created system task for cron job: {job.id}")
+        except Exception as e:
+            logger.warning(f"[TaskBoard] Failed to create task for cron job: {e}")
+
         logger.info(f"Created job: {name} ({job.id})")
-        
+
         if self.scheduler and enabled:
             try:
                 await self.scheduler.trigger_reschedule()
@@ -150,16 +165,31 @@ class CronService:
         job = await self.get_job(job_id)
         if job is None:
             return False
-        
+
         if job_id in self._running_jobs:
             self._running_jobs[job_id].cancel()
             del self._running_jobs[job_id]
-        
+
+        # 同步取消任务看板项
+        try:
+            from backend.models.task_item import TaskItem
+            result = await self.db.execute(
+                select(TaskItem).where(TaskItem.cron_id == job_id)
+            )
+            task_items = result.scalars().all()
+            for task_item in task_items:
+                task_item.status = "cancelled"
+            if task_items:
+                await self.db.commit()
+                logger.info(f"[TaskBoard] Cancelled {len(task_items)} tasks for cron job: {job_id}")
+        except Exception as e:
+            logger.warning(f"[TaskBoard] Failed to cancel tasks for cron job: {e}")
+
         await self.db.delete(job)
         await self.db.commit()
-        
+
         logger.info(f"Deleted job: {job.name} ({job_id})")
-        
+
         if self.scheduler:
             try:
                 await self.scheduler.trigger_reschedule()
