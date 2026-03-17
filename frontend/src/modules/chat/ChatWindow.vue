@@ -371,7 +371,8 @@ import {
   Trash2 as TrashIcon,
   List as ListIcon,
   ListTodo as ListTodoIcon,
-  BookOpen as BookOpenIcon
+  BookOpen as BookOpenIcon,
+  Search as SearchIcon
 } from 'lucide-vue-next'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import LanguageSelector from '@/components/ui/LanguageSelector.vue'
@@ -398,6 +399,16 @@ import { toolsAPI, authAPI } from '@/api/endpoints'
 
 // 导入停止 API
 import { stopAPI } from '@/api/endpoints'
+
+// 知识检索组合图标组件
+const KnowledgeSearchIcon = {
+  render() {
+    return h('div', { class: 'knowledge-icon' }, [
+      h(BookOpenIcon, { size: 20 }),
+      h(SearchIcon, { size: 12, class: 'search-badge' })
+    ])
+  }
+}
 
 const { t } = useI18n()
 const chatStore = useChatStore()
@@ -1030,7 +1041,7 @@ const headerActions = computed(() => [
   // tasks 已移至左侧常驻显示
   { id: 'cron', icon: ClockIcon, label: 'nav.cron', tooltip: 'nav.cronTooltip', onClick: () => showPanel('cron') },
   { id: 'timeline', icon: ListIcon, label: 'nav.timeline', tooltip: 'nav.timelineTooltip', onClick: () => toggleTimeline() },
-  { id: 'knowledgeHub', icon: BookOpenIcon, label: 'settings.tabs.knowledgeHub', tooltip: 'nav.knowledgeHubTooltip', onClick: () => showPanel('knowledgeHub') },
+  { id: 'knowledgeHub', icon: KnowledgeSearchIcon, label: 'settings.tabs.knowledgeHub', tooltip: 'nav.knowledgeHubTooltip', onClick: () => showPanel('knowledgeHub') },
   { id: 'settings', icon: SettingsIcon, label: 'settings.title', tooltip: 'nav.settingsTooltip', onClick: () => showPanel('settings') }
 ])
 
@@ -2517,5 +2528,21 @@ onBeforeUnmount(() => {
   .timeline-sidebar {
     width: 100%;
   }
+}
+
+/* 知识检索组合图标 */
+.knowledge-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.knowledge-icon .search-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -4px;
 }
 </style>
