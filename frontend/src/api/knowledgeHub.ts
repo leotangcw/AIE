@@ -58,35 +58,35 @@ export interface RetrieveResult {
 export const knowledgeHubApi = {
   // 知识检索
   retrieve: async (request: RetrieveRequest): Promise<RetrieveResult> => {
-    const response = await apiClient.post('/api/knowledge_hub/retrieve', request)
+    const response = await apiClient.post('/knowledge_hub/retrieve', request)
     return response.data
   },
 
   // 智能数据库查询
   queryDb: async (question: string): Promise<any> => {
-    const response = await apiClient.post('/api/knowledge_hub/query-db', { question })
+    const response = await apiClient.post('/knowledge_hub/query-db', { question })
     return response.data
   },
 
   // 获取配置
   getConfig: async (): Promise<KnowledgeHubConfig> => {
-    const response = await apiClient.get('/api/knowledge_hub/config')
+    const response = await apiClient.get('/knowledge_hub/config')
     return response.data
   },
 
   // 更新配置
   updateConfig: async (config: Partial<KnowledgeHubConfig>): Promise<void> => {
-    await apiClient.put('/api/knowledge_hub/config', config)
+    await apiClient.put('/knowledge_hub/config', config)
   },
 
   // 刷新缓存
   refreshCache: async (cacheType?: string): Promise<void> => {
-    await apiClient.post('/api/knowledge_hub/cache/refresh', null, { params: { cache_type: cacheType } })
+    await apiClient.post('/knowledge_hub/cache/refresh', null, { params: { cache_type: cacheType } })
   },
 
   // 获取知识源列表
   getSources: async (): Promise<SourceConfig[]> => {
-    const response = await apiClient.get('/api/knowledge_hub/sources')
+    const response = await apiClient.get('/knowledge_hub/sources')
     return response.data
   },
 
@@ -98,13 +98,13 @@ export const knowledgeHubApi = {
     enabled?: boolean
     priority?: number
   }): Promise<SourceConfig> => {
-    const response = await apiClient.post('/api/knowledge_hub/sources', source)
+    const response = await apiClient.post('/knowledge_hub/sources', source)
     return response.data
   },
 
   // 同步知识源
   syncSource: async (sourceId: string): Promise<{ chunks_count: number }> => {
-    const response = await apiClient.post(`/api/knowledge_hub/sources/${sourceId}/sync`)
+    const response = await apiClient.post(`/knowledge_hub/sources/${sourceId}/sync`)
     return response.data
   },
 }
