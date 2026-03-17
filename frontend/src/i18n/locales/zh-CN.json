@@ -135,6 +135,8 @@
         "typeWiki": "维基百科",
         "typeDatabase": "数据库",
         "typeApi": "API",
+        "localPath": "本地目录",
+        "localPathPlaceholder": "输入本地目录路径，如：/home/user/docs",
         "lastSync": "上次同步",
         "neverSynced": "从未同步",
         "uploadDocument": "上传文档",

@@ -32,13 +32,13 @@ export interface KnowledgeRetrieveResult {
 export const knowledgeApi = {
   // 获取所有知识源
   getSources: async (): Promise<KnowledgeSource[]> => {
-    const response = await apiClient.get('/api/knowledge/sources')
+    const response = await apiClient.get('/knowledge/sources')
     return response || []
   },
 
   // 创建知识源
   createSource: async (name: string, sourceType: string, config: Record<string, any> = {}): Promise<KnowledgeSource> => {
-    const response = await apiClient.post('/api/knowledge/sources', {
+    const response = await apiClient.post('/knowledge/sources', {
       name,
       source_type: sourceType,
       config
@@ -48,26 +48,26 @@ export const knowledgeApi = {
 
   // 删除知识源
   deleteSource: async (sourceId: string): Promise<void> => {
-    await apiClient.delete(`/api/knowledge/sources/${sourceId}`)
+    await apiClient.delete(`/knowledge/sources/${sourceId}`)
   },
 
   // 上传文档到知识源
   addDocument: async (sourceId: string, file: File): Promise<{ chunks_added: number }> => {
     const formData = new FormData()
     formData.append('file', file)
-    const response = await apiClient.postForm(`/api/knowledge/sources/${sourceId}/documents`, formData)
+    const response = await apiClient.postForm(`/knowledge/sources/${sourceId}/documents`, formData)
     return response
   },
 
   // 检索知识
   retrieve: async (request: RetrieveRequest): Promise<KnowledgeRetrieveResult> => {
-    const response = await apiClient.post('/api/knowledge/retrieve', request)
+    const response = await apiClient.post('/knowledge/retrieve', request)
     return response
   },
 
   // 增强上下文
   augmentContext: async (query: string, context: Record<string, any>, topK = 3): Promise<Record<string, any>> => {
-    const response = await apiClient.post('/api/knowledge/augment', {
+    const response = await apiClient.post('/knowledge/augment', {
       query,
       context,
       top_k: topK
