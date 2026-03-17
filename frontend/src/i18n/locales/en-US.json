@@ -105,12 +105,14 @@
         "experience": "Experience",
         "cron": "Scheduler",
         "timeline": "Timeline",
+        "tasks": "Task Board",
         "sessionsTooltip": "View session history",
         "memoryTooltip": "View memory bank",
         "skillsTooltip": "Manage skills",
         "experienceTooltip": "View learning experience",
         "cronTooltip": "Manage scheduled tasks",
         "timelineTooltip": "View message timeline",
+        "tasksTooltip": "View task board",
         "settingsTooltip": "Open settings"
     },
     "chat": {
@@ -314,7 +316,8 @@
             "system": "System",
             "channels": "Channels",
             "rules": "Enterprise Rules",
-            "knowledge": "Knowledge Base"
+            "knowledge": "Knowledge Base",
+            "knowledgeHub": "Knowledge Hub"
         },
         "tabShort": {
             "provider": "Provider",
@@ -324,7 +327,8 @@
             "security": "Security",
             "channels": "Channels",
             "rules": "Rules",
-            "knowledge": "Knowledge"
+            "knowledge": "Knowledge",
+            "knowledgeHub": "Hub"
         },
         "saveSuccess": "Settings saved successfully",
         "saveError": "Failed to save settings",
@@ -1033,6 +1037,25 @@
         "deleteSuccess": "Task \"{label}\" deleted successfully",
         "deleteError": "Failed to delete task",
         "loadError": "Failed to load tasks"
+    },
+    "taskBoard": {
+        "title": "Task Board",
+        "description": "Track long-running tasks and periodic jobs",
+        "systemTasks": "Periodic Tasks",
+        "runningTasks": "In Progress",
+        "doneTasks": "Completed",
+        "noSystemTasks": "No periodic tasks",
+        "noRunningTasks": "No running tasks",
+        "noDoneTasks": "No completed tasks",
+        "status": {
+            "pending": "Pending",
+            "running": "Running",
+            "done": "Done",
+            "failed": "Failed",
+            "cancelled": "Cancelled",
+            "ok": "OK",
+            "error": "Error"
+        }
     },
     "timeline": {
         "title": "Timeline",
