@@ -29,7 +29,7 @@ export interface Settings {
     fontSize: 'small' | 'medium' | 'large'
 }
 
-export type SettingsTab = 'provider' | 'model' | 'persona' | 'workspace' | 'security' | 'channels' | 'rules' | 'knowledge'
+export type SettingsTab = 'provider' | 'model' | 'persona' | 'workspace' | 'security' | 'channels' | 'rules'
 
 export interface HeartbeatConfig {
     enabled: boolean
