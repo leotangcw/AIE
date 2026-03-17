@@ -105,12 +105,14 @@
         "memory": "记忆库",
         "skills": "技能库",
         "experience": "经验学习",
+        "tasks": "任务看板",
         "cron": "定时任务",
         "timeline": "时间轴",
         "sessionsTooltip": "查看会话历史",
         "memoryTooltip": "查看记忆库",
         "skillsTooltip": "管理技能",
         "experienceTooltip": "查看学习经验",
+        "tasksTooltip": "查看任务看板",
         "cronTooltip": "管理定时任务",
         "timelineTooltip": "查看消息时间轴",
         "settingsTooltip": "打开设置"
@@ -221,8 +223,27 @@
             "desc": "创建和管理定时任务"
         },
         "tasks": {
-            "title": "后台任务",
-            "desc": "查看正在运行的后台任务"
+            "title": "任务看板",
+            "desc": "跟踪和管理正在运行的任务"
+        }
+    },
+    "taskBoard": {
+        "title": "任务看板",
+        "description": "跟踪长时间运行的任务和周期任务",
+        "systemTasks": "周期任务",
+        "runningTasks": "进行中",
+        "doneTasks": "已完成",
+        "noSystemTasks": "暂无周期任务",
+        "noRunningTasks": "暂无进行中的任务",
+        "noDoneTasks": "暂无已完成的任务",
+        "status": {
+            "pending": "待开始",
+            "running": "进行中",
+            "done": "已完成",
+            "failed": "异常",
+            "cancelled": "已取消",
+            "ok": "正常",
+            "error": "错误"
         }
     },
     "tools": {
@@ -322,7 +343,8 @@
             "system": "系统集成",
             "channels": "渠道配置",
             "rules": "企业规则",
-            "knowledge": "知识库"
+            "knowledge": "知识库",
+            "knowledgeHub": "知识中枢"
         },
         "tabShort": {
             "provider": "供应商",
@@ -332,7 +354,8 @@
             "security": "安全",
             "channels": "渠道",
             "rules": "规则",
-            "knowledge": "知识"
+            "knowledge": "知识",
+            "knowledgeHub": "中枢"
         },
         "saveSuccess": "设置保存成功",
         "saveError": "保存设置失败",
