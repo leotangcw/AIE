@@ -116,6 +116,8 @@
         "cronTooltip": "管理定时任务",
         "timelineTooltip": "查看消息时间轴",
         "settingsTooltip": "打开设置",
+        "knowledgeSearch": "知识检索系统",
+        "knowledgeSearchTooltip": "知识检索系统",
         "knowledgeHubTooltip": "知识中枢"
     },
     "chat": {

@@ -114,6 +114,8 @@
         "timelineTooltip": "View message timeline",
         "tasksTooltip": "View task board",
         "settingsTooltip": "Open settings",
+        "knowledgeSearch": "Knowledge Search System",
+        "knowledgeSearchTooltip": "Knowledge Search System",
         "knowledgeHubTooltip": "Knowledge Hub"
     },
     "chat": {
