@@ -11,6 +11,7 @@ from collections import deque
 from loguru import logger
 
 from backend.modules.agent.subagent_types import SubagentType, SubagentDefaults
+from backend.modules.agent.task_board import TaskBoardService
 
 
 class TaskStatus(Enum):
@@ -34,6 +35,7 @@ class SubagentTask:
         session_id: str | None = None,
         subagent_type: SubagentType = SubagentType.GENERAL,
         timeout: int = None,
+        parent_task_id: str | None = None,  # 关联的父任务ID (TaskBoard)
     ):
         self.task_id = task_id
         self.label = label
@@ -41,6 +43,7 @@ class SubagentTask:
         self.session_id = session_id
         self.subagent_type = subagent_type
         self.timeout = timeout or SubagentDefaults.get_timeout(subagent_type)
+        self.parent_task_id = parent_task_id  # TaskBoard父任务ID
 
         self.status = TaskStatus.PENDING
         self.progress = 0
@@ -52,7 +55,9 @@ class SubagentTask:
 
         # 扩展字段
         self.tool_calls: list[dict] = []
+        self.task_board_item_id: str | None = None  # 关联的任务看板ID
         self.events: list[dict] = deque(maxlen=100)  # 保留最近100个事件
+        self.task_board_item_id: str | None = None  # 对应的TaskBoard任务ID
 
     def add_event(self, event_type: str, details: dict = None):
         """添加任务事件"""
@@ -153,7 +158,74 @@ class SubagentManager:
         self.tasks: dict[str, SubagentTask] = {}
         self.running_tasks: dict[str, asyncio.Task] = {}
 
+        # TaskBoard 服务（可选，用于同步任务状态）
+        self._task_board_service = None
+
         logger.debug("SubagentManager initialized")
+
+    async def _get_task_board_service(self):
+        """获取 TaskBoardService 实例（延迟初始化，每次创建新会话）"""
+        try:
+            from backend.database import AsyncSessionLocal
+            from backend.modules.agent.task_board import TaskBoardService
+            # 每次创建新的数据库会话
+            db = AsyncSessionLocal()
+            return TaskBoardService(db)
+        except Exception as e:
+            logger.warning(f"Failed to initialize TaskBoardService: {e}")
+            return None
+
+    async def _sync_task_to_board(self, task: SubagentTask, action: str):
+        """同步任务状态到任务看板"""
+        try:
+            task_service = await self._get_task_board_service()
+            if task_service is None:
+                return
+
+            # 根据 action 执行不同的操作
+            if action == "start":
+                # 创建任务项并标记为开始
+                task_item = await task_service.create_session_task(
+                    title=task.label,
+                    task_type="subagent",
+                    session_id=task.session_id,
+                    description=task.message,
+                    estimated_duration=task.timeout,
+                )
+                task.task_board_item_id = task_item.id
+                logger.info(f"[TaskBoard] Created task item: {task_item.id} for subagent: {task.task_id}")
+
+                # 更新为运行中
+                await task_service.start_task(task_item.id)
+                logger.info(f"[TaskBoard] Started task: {task_item.id}")
+
+            elif action == "progress" and task.task_board_item_id:
+                # 更新进度
+                await task_service.update_progress(
+                    task.task_board_item_id,
+                    progress=task.progress
+                )
+
+            elif action == "complete" and task.task_board_item_id:
+                # 标记完成
+                await task_service.complete_task(task.task_board_item_id)
+                logger.info(f"[TaskBoard] Completed task: {task.task_board_item_id}")
+
+            elif action == "cancel" and task.task_board_item_id:
+                # 标记取消
+                await task_service.cancel_task(task.task_board_item_id)
+                logger.info(f"[TaskBoard] Cancelled task: {task.task_board_item_id}")
+
+            elif action == "fail" and task.task_board_item_id:
+                # 标记失败
+                await task_service.fail_task(
+                    task.task_board_item_id,
+                    error_message=task.error or "Task failed"
+                )
+                logger.info(f"[TaskBoard] Failed task: {task.task_board_item_id}")
+
+        except Exception as e:
+            logger.warning(f"[TaskBoard] Failed to sync task {task.task_id}: {e}")
 
     def create_task(
         self,
@@ -162,6 +234,7 @@ class SubagentManager:
         session_id: str | None = None,
         subagent_type: SubagentType = SubagentType.GENERAL,
         timeout: int = None,
+        parent_task_id: str | None = None,
     ) -> str:
         """
         创建新的后台任务
@@ -172,6 +245,7 @@ class SubagentManager:
             session_id: 关联的会话 ID (可选)
             subagent_type: 子代理类型
             timeout: 超时时间（秒），默认使用类型默认值
+            parent_task_id: TaskBoard父任务ID (可选)
 
         Returns:
             str: 任务 ID
@@ -185,6 +259,7 @@ class SubagentManager:
             session_id=session_id,
             subagent_type=subagent_type,
             timeout=timeout,
+            parent_task_id=parent_task_id,
         )
 
         self.tasks[task_id] = task
@@ -196,27 +271,30 @@ class SubagentManager:
     async def execute_task(self, task_id: str) -> None:
         """
         执行后台任务
-        
+
         Args:
             task_id: 任务 ID
-            
+
         Raises:
             ValueError: 任务不存在
         """
         task = self.tasks.get(task_id)
         if not task:
             raise ValueError(f"Task {task_id} not found")
-        
+
         if task.status != TaskStatus.PENDING:
             logger.warning(f"Task {task_id} is not pending, current status: {task.status}")
             return
-        
+
         task.status = TaskStatus.RUNNING
         task.started_at = datetime.now()
         task.progress = 0
-        
+
         logger.info(f"Starting task {task_id}: {task.label}")
-        
+
+        # 同步任务状态到任务看板
+        await self._sync_task_to_board(task, "start")
+
         # 创建异步任务
         async_task = asyncio.create_task(self._run_task(task))
         self.running_tasks[task_id] = async_task
@@ -343,24 +421,33 @@ class SubagentManager:
             task.status = TaskStatus.COMPLETED
             task.progress = 100
             task.completed_at = datetime.now()
-            
+
             logger.info(f"Task {task.task_id} completed successfully")
-            
+
+            # 同步到任务看板
+            await self._sync_task_to_board(task, "complete")
+
         except asyncio.CancelledError:
             # 任务被取消
             task.status = TaskStatus.CANCELLED
             task.completed_at = datetime.now()
-            
+
             logger.info(f"Task {task.task_id} was cancelled")
-            
+
+            # 同步到任务看板
+            await self._sync_task_to_board(task, "cancel")
+
         except Exception as e:
             # 任务失败
             task.status = TaskStatus.FAILED
             task.error = str(e)
             task.completed_at = datetime.now()
-            
+
             logger.error(f"Task {task.task_id} failed: {e}")
-            
+
+            # 同步到任务看板
+            await self._sync_task_to_board(task, "fail")
+
         finally:
             # 清理运行中的任务
             if task.task_id in self.running_tasks:

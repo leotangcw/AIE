@@ -127,43 +127,57 @@
       </div>
     </div>
 
-    <!-- 聊天区域 -->
-    <main
-      class="main"
-      @dragenter.prevent="handleMainDragEnter"
-      @dragover.prevent="handleMainDragOver"
-      @dragleave.prevent="handleMainDragLeave"
-      @drop.prevent="handleMainDrop"
-    >
-      <!-- 加载状态 -->
-      <div
-        v-if="isLoadingMessages"
-        class="loading-container"
+    <!-- 左侧任务看板栏 + 聊天区域 -->
+    <div class="main-container">
+      <!-- 左侧任务看板栏 -->
+      <aside
+        v-if="showTaskBoard"
+        class="task-board-sidebar"
       >
-        <LoadingState
-          type="skeleton"
-          :lines="5"
-        />
-      </div>
-      
-      <!-- 空状态 -->
-      <EmptyState
-        v-else-if="messages.length === 0"
-        icon="message-square"
-        :title="$t('chat.emptyTitle')"
-        :description="$t('chat.emptyDescription')"
-      />
-      
-      <!-- 消息列表 (虚拟滚动) -->
-      <MessageList
-        v-else
-        ref="messageListRef"
-        :messages="messages"
-        :auto-scroll="true"
-        @regenerate="handleRegenerate"
-        @delete="handleDelete"
-      />
-    </main>
+        <TaskBoard />
+      </aside>
+
+      <!-- 聊天区域 -->
+      <main
+        class="main"
+        @dragenter.prevent="handleMainDragEnter"
+        @dragover.prevent="handleMainDragOver"
+        @dragleave.prevent="handleMainDragLeave"
+        @drop.prevent="handleMainDrop"
+      >
+        <!-- 聊天内容区域 -->
+        <div class="chat-content">
+          <!-- 加载状态 -->
+          <div
+            v-if="isLoadingMessages"
+            class="loading-container"
+          >
+            <LoadingState
+              type="skeleton"
+              :lines="5"
+            />
+          </div>
+
+          <!-- 空状态 -->
+          <EmptyState
+            v-else-if="messages.length === 0"
+            icon="message-square"
+            :title="$t('chat.emptyTitle')"
+            :description="$t('chat.emptyDescription')"
+          />
+
+          <!-- 消息列表 (虚拟滚动) -->
+          <MessageList
+            v-else
+            ref="messageListRef"
+            :messages="messages"
+            :auto-scroll="true"
+            @regenerate="handleRegenerate"
+            @delete="handleDelete"
+          />
+        </div>
+      </main>
+    </div>
 
     <!-- 输入区域 -->
     <footer class="input-area">
@@ -277,7 +291,15 @@
 
         <!-- Cron Panel -->
         <CronManager v-else-if="activePanel === 'cron'" />
+
+        <!-- Task Board Panel -->
+        <TaskBoard v-else-if="activePanel === 'tasks'" />
         
+        <!-- Knowledge Hub Panel -->
+        <div v-else-if="activePanel === 'knowledgeHub'" class="panel-content">
+          <KnowledgeHubConfig />
+        </div>
+
         <!-- Settings Panel -->
         <SettingsPanel
           v-else-if="activePanel === 'settings'"
@@ -347,7 +369,9 @@ import {
   Download as DownloadIcon,
   ShieldAlert as ShieldAlertIcon,
   Trash2 as TrashIcon,
-  List as ListIcon
+  List as ListIcon,
+  ListTodo as ListTodoIcon,
+  BookOpen as BookOpenIcon
 } from 'lucide-vue-next'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import LanguageSelector from '@/components/ui/LanguageSelector.vue'
@@ -356,10 +380,12 @@ import MessageItem from './MessageItem.vue'
 import MessageList from './MessageList.vue'
 import SessionPanel from './SessionPanel.vue'
 import SettingsPanel from '@/modules/settings/SettingsPanel.vue'
+import KnowledgeHubConfig from '@/modules/knowledge/KnowledgeHubConfig.vue'
 import ToolsPanel from '@/modules/tools/ToolsPanel.vue'
 import MemoryPanel from '@/modules/memory/MemoryPanel.vue'
 import SkillsLibrary from '@/modules/skills/SkillsLibrary.vue'
 import CronManager from '@/modules/scheduler/CronManager.vue'
+import TaskBoard from '@/modules/tasks/TaskBoard.vue'
 import SystemSidebar from '@/modules/system/SystemSidebar.vue'
 import ExperiencePanel from '@/modules/experience/ExperiencePanel.vue'
 import TimelinePanel from './TimelinePanel.vue'
@@ -426,7 +452,7 @@ const handleSetupPassword = async () => {
   }
 }
 
-type PanelType = 'sessions' | 'tools' | 'memory' | 'skills' | 'cron' | 'settings' | null
+type PanelType = 'sessions' | 'tools' | 'memory' | 'skills' | 'cron' | 'tasks' | 'settings' | null
 
 // Initialize chat composable with reactive session ID
 const messages = ref<any[]>([])
@@ -974,6 +1000,7 @@ const activePanel = ref<PanelType>(null)
 const selectedFiles = ref<File[]>([])
 const showSystemSidebar = ref(false)
 const showTimeline = ref(false)
+const showTaskBoard = ref(true) // 左侧任务看板默认显示
 const activeMessageId = ref<string | null>(null)
 const isDraggingOver = ref(false)
 const isInputFocused = ref(false)
@@ -1000,8 +1027,10 @@ const headerActions = computed(() => [
   { id: 'memory', icon: BrainIcon, label: 'nav.memory', tooltip: 'nav.memoryTooltip', onClick: () => showPanel('memory') },
   { id: 'skills', icon: ZapIcon, label: 'nav.skills', tooltip: 'nav.skillsTooltip', onClick: () => showPanel('skills') },
   { id: 'experience', icon: GraduationIcon, label: 'nav.experience', tooltip: 'nav.experienceTooltip', onClick: () => showPanel('experience') },
+  // tasks 已移至左侧常驻显示
   { id: 'cron', icon: ClockIcon, label: 'nav.cron', tooltip: 'nav.cronTooltip', onClick: () => showPanel('cron') },
   { id: 'timeline', icon: ListIcon, label: 'nav.timeline', tooltip: 'nav.timelineTooltip', onClick: () => toggleTimeline() },
+  { id: 'knowledgeHub', icon: BookOpenIcon, label: 'settings.tabs.knowledgeHub', tooltip: 'nav.knowledgeHubTooltip', onClick: () => showPanel('knowledgeHub') },
   { id: 'settings', icon: SettingsIcon, label: 'settings.title', tooltip: 'nav.settingsTooltip', onClick: () => showPanel('settings') }
 ])
 
@@ -2060,12 +2089,42 @@ onBeforeUnmount(() => {
   animation: spin 0.6s linear infinite;
 }
 
+/* 主容器：包含左侧看板和聊天区域 */
+.main-container {
+  grid-row: 2;
+  display: flex;
+  overflow: hidden;
+  height: 100%;
+}
+
 /* 主区域 */
 .main {
-  grid-row: 2;
+  flex: 1;
   position: relative;
   overflow: hidden;
-  /* Grid 自动处理高度 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 左侧任务看板栏 */
+.task-board-sidebar {
+  width: 280px;
+  min-width: 280px;
+  max-width: 280px;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+/* 聊天内容区域 */
+.chat-content {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 确保子元素填满 main 区域 */
@@ -2315,6 +2374,12 @@ onBeforeUnmount(() => {
   height: 100%;
   color: var(--text-tertiary);
   font-size: var(--font-size-base);
+}
+
+.panel-content {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-primary);
 }
 
 /* 遮罩 */

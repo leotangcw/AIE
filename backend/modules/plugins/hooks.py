@@ -160,7 +160,7 @@ def create_hook(
     event: str,
     description: str = "",
     priority: int = 0,
-) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]], Hook]:
+) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
     """
     装饰器：创建钩子
 

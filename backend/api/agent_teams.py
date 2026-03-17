@@ -205,6 +205,7 @@ async def execute_workflow(payload: ExecuteWorkflowRequest) -> dict:
     from backend.modules.agent.workflow import WorkflowEngine
     from backend.modules.agent.subagent import SubagentManager
     from backend.modules.agent.skills import SkillsLoader
+    from backend.modules.agent.task_board import TaskBoardService
     from backend.ws.connection import get_cancel_token
     from backend.utils.paths import WORKSPACE_DIR
 
@@ -215,6 +216,24 @@ async def execute_workflow(payload: ExecuteWorkflowRequest) -> dict:
 
     if not team:
         raise HTTPException(status_code=404, detail=f"Agent team '{payload.team_id}' not found")
+
+    # 创建任务看板项
+    task_board_id = None
+    if payload.session_id:
+        try:
+            async with AsyncSessionLocal() as db:
+                task_service = TaskBoardService(db)
+                task_item = await task_service.create_session_task(
+                    title=f"工作流: {team.name}",
+                    task_type="workflow",
+                    session_id=payload.session_id,
+                    description=payload.question,
+                    estimated_duration=600,  # 默认10分钟
+                )
+                task_board_id = task_item.id
+                logger.info(f"[TaskBoard] Created workflow task: {task_board_id}")
+        except Exception as e:
+            logger.warning(f"[TaskBoard] Failed to create task for workflow: {e}")
 
     # 获取子代理管理器
     skills_dir = WORKSPACE_DIR / "skills"
@@ -232,6 +251,7 @@ async def execute_workflow(payload: ExecuteWorkflowRequest) -> dict:
         session_id=payload.session_id,
         cancel_token=cancel_token,
         skills=skills,
+        task_board_id=task_board_id,
     )
 
     # 根据模式执行工作流
