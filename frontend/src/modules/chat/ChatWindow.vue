@@ -295,9 +295,9 @@
         <!-- Task Board Panel -->
         <TaskBoard v-else-if="activePanel === 'tasks'" />
         
-        <!-- Knowledge Hub Panel -->
-        <div v-else-if="activePanel === 'knowledgeHub'" class="panel-content">
-          <KnowledgeHubConfig />
+        <!-- Knowledge Search Panel -->
+        <div v-else-if="activePanel === 'knowledge_search'" class="panel-content">
+          <KnowledgeSearchSystem />
         </div>
 
         <!-- Settings Panel -->
@@ -381,7 +381,7 @@ import MessageItem from './MessageItem.vue'
 import MessageList from './MessageList.vue'
 import SessionPanel from './SessionPanel.vue'
 import SettingsPanel from '@/modules/settings/SettingsPanel.vue'
-import KnowledgeHubConfig from '@/modules/knowledge/KnowledgeHubConfig.vue'
+import KnowledgeSearchSystem from '@/modules/knowledge/KnowledgeSearchSystem.vue'
 import ToolsPanel from '@/modules/tools/ToolsPanel.vue'
 import MemoryPanel from '@/modules/memory/MemoryPanel.vue'
 import SkillsLibrary from '@/modules/skills/SkillsLibrary.vue'
@@ -1041,7 +1041,7 @@ const headerActions = computed(() => [
   // tasks 已移至左侧常驻显示
   { id: 'cron', icon: ClockIcon, label: 'nav.cron', tooltip: 'nav.cronTooltip', onClick: () => showPanel('cron') },
   { id: 'timeline', icon: ListIcon, label: 'nav.timeline', tooltip: 'nav.timelineTooltip', onClick: () => toggleTimeline() },
-  { id: 'knowledgeHub', icon: KnowledgeSearchIcon, label: 'settings.tabs.knowledgeHub', tooltip: 'nav.knowledgeHubTooltip', onClick: () => showPanel('knowledgeHub') },
+  { id: 'knowledge_search', icon: KnowledgeSearchIcon, label: 'nav.knowledgeSearch', tooltip: 'nav.knowledgeSearchTooltip', onClick: () => showPanel('knowledge_search') },
   { id: 'settings', icon: SettingsIcon, label: 'settings.title', tooltip: 'nav.settingsTooltip', onClick: () => showPanel('settings') }
 ])
 
