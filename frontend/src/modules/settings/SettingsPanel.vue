@@ -119,24 +119,6 @@
           >
             <RulesConfig />
           </div>
-
-          <!-- Knowledge Configuration -->
-          <div
-            v-else-if="activeTab === 'knowledge'"
-            key="knowledge"
-            class="tab-pane"
-          >
-            <KnowledgeConfig />
-          </div>
-
-          <!-- KnowledgeHub Configuration -->
-          <div
-            v-else-if="activeTab === 'knowledge_hub'"
-            key="knowledge_hub"
-            class="tab-pane"
-          >
-            <KnowledgeHubConfig />
-          </div>
         </transition>
       </div>
 
@@ -170,9 +152,7 @@ import {
   FolderOpen as FolderIcon,
   Shield as ShieldIcon,
   MessageSquare as MessageIcon,
-  FileCode as FileCodeIcon,
-  BookOpen as BookOpenIcon,
-  Network as NetworkIcon
+  FileCode as FileCodeIcon
 } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import ProviderConfig from './ProviderConfig.vue'
@@ -183,8 +163,6 @@ import WorkspaceConfig from './WorkspaceConfig.vue'
 import SecurityConfig from './SecurityConfig.vue'
 import ChannelsConfig from './ChannelsConfig.vue'
 import RulesConfig from './RulesConfig.vue'
-import KnowledgeConfig from './KnowledgeConfig.vue'
-import KnowledgeHubConfig from '../knowledge/KnowledgeHubConfig.vue'
 import { useSettingsStore } from '@/store/settings'
 import { useToast } from '@/composables/useToast'
 import type { SettingsTab } from '@/types/settings'
@@ -204,9 +182,7 @@ const tabs = [
   { id: 'workspace' as SettingsTab, icon: FolderIcon, label: 'settings.tabs.workspace', shortLabel: 'settings.tabShort.workspace' },
   { id: 'security' as SettingsTab, icon: ShieldIcon, label: 'settings.tabs.security', shortLabel: 'settings.tabShort.security' },
   { id: 'channels' as SettingsTab, icon: MessageIcon, label: 'settings.tabs.channels', shortLabel: 'settings.tabShort.channels' },
-  { id: 'rules' as SettingsTab, icon: FileCodeIcon, label: 'settings.tabs.rules', shortLabel: 'settings.tabShort.rules' },
-  { id: 'knowledge' as SettingsTab, icon: BookOpenIcon, label: 'settings.tabs.knowledge', shortLabel: 'settings.tabShort.knowledge' },
-  { id: 'knowledge_hub' as SettingsTab, icon: NetworkIcon, label: 'settings.tabs.knowledgeHub', shortLabel: 'settings.tabShort.knowledgeHub' }
+  { id: 'rules' as SettingsTab, icon: FileCodeIcon, label: 'settings.tabs.rules', shortLabel: 'settings.tabShort.rules' }
 ]
 
 const emit = defineEmits<{
