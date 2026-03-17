@@ -131,6 +131,8 @@
         "typeWiki": "Wikipedia",
         "typeDatabase": "Database",
         "typeApi": "API",
+        "localPath": "Local Directory",
+        "localPathPlaceholder": "Enter local directory path, e.g., /home/user/docs",
         "lastSync": "Last sync",
         "neverSynced": "Never synced",
         "uploadDocument": "Upload Document",

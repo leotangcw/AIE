@@ -207,6 +207,12 @@
               <option value="api">{{ $t('knowledgeSearch.typeApi') }}</option>
             </select>
           </div>
+
+          <!-- 本地文档需要输入目录路径 -->
+          <div v-if="newSource.source_type === 'local'" class="form-group">
+            <label>{{ $t('knowledgeSearch.localPath') }}</label>
+            <input v-model="newSource.config.path" type="text" :placeholder="$t('knowledgeSearch.localPathPlaceholder')" />
+          </div>
         </div>
 
         <div class="dialog-footer">
@@ -256,7 +262,10 @@ const sources = ref<KnowledgeSource[]>([])
 const showCreateDialog = ref(false)
 const newSource = ref({
   name: '',
-  source_type: 'local'
+  source_type: 'local',
+  config: {
+    path: ''
+  }
 })
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploadingSourceId = ref<string | null>(null)
@@ -300,12 +309,20 @@ const createSource = async () => {
     toast.error(t('knowledgeSearch.createError'))
     return
   }
+  // 本地文档类型需要目录路径
+  if (newSource.value.source_type === 'local' && !newSource.value.config.path?.trim()) {
+    toast.error(t('knowledgeSearch.createError'))
+    return
+  }
   try {
-    await knowledgeApi.createSource(newSource.value.name, newSource.value.source_type)
+    const config = newSource.value.source_type === 'local'
+      ? { path: newSource.value.config.path }
+      : {}
+    await knowledgeApi.createSource(newSource.value.name, newSource.value.source_type, config)
     toast.success(t('knowledgeSearch.createSuccess'))
     await loadSources()
     showCreateDialog.value = false
-    newSource.value = { name: '', source_type: 'local' }
+    newSource.value = { name: '', source_type: 'local', config: { path: '' } }
   } catch (error) {
     console.error('Failed to create source:', error)
     toast.error(t('knowledgeSearch.createError'))
