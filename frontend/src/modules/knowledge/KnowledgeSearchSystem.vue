@@ -3,23 +3,23 @@
     <!-- Section 1: Knowledge Source Management -->
     <div class="source-section">
       <div class="section-header">
-        <h3>{{ $t('settings.knowledge.title') }}</h3>
-        <p>{{ $t('settings.knowledge.description') }}</p>
+        <h3>{{ $t('knowledgeSearch.title') }}</h3>
+        <p>{{ $t('knowledgeSearch.description') }}</p>
       </div>
 
       <div class="sources-list">
         <div class="list-header">
-          <span class="header-title">{{ $t('settings.knowledge.sourcesList') }}</span>
+          <span class="header-title">{{ $t('knowledgeSearch.sourcesList') }}</span>
           <button class="add-btn" @click="showCreateDialog = true">
             <component :is="PlusIcon" :size="16" />
-            {{ $t('settings.knowledge.addSource') }}
+            {{ $t('knowledgeSearch.addSource') }}
           </button>
         </div>
 
         <!-- Empty state -->
         <div v-if="sources.length === 0" class="empty-state">
           <component :is="BookOpenIcon" :size="48" class="empty-icon" />
-          <p>{{ $t('settings.knowledge.empty') }}</p>
+          <p>{{ $t('knowledgeSearch.empty') }}</p>
         </div>
 
         <!-- Source cards -->
@@ -52,11 +52,11 @@
               <div class="source-meta">
                 <span v-if="source.last_sync" class="meta-item">
                   <component :is="ClockIcon" :size="14" />
-                  {{ $t('settings.knowledge.lastSync') }}: {{ formatDate(source.last_sync) }}
+                  {{ $t('knowledgeSearch.lastSync') }}: {{ formatDate(source.last_sync) }}
                 </span>
                 <span v-else class="meta-item">
                   <component :is="ClockIcon" :size="14" />
-                  {{ $t('settings.knowledge.neverSynced') }}
+                  {{ $t('knowledgeSearch.neverSynced') }}
                 </span>
               </div>
             </div>
@@ -64,7 +64,7 @@
             <div class="source-footer">
               <button class="action-btn" @click="uploadDocument(source.id)">
                 <component :is="UploadIcon" :size="16" />
-                {{ $t('settings.knowledge.uploadDocument') }}
+                {{ $t('knowledgeSearch.uploadDocument') }}
               </button>
               <button class="action-btn danger" @click="deleteSource(source.id)">
                 <component :is="TrashIcon" :size="16" />
@@ -186,7 +186,7 @@
     <div v-if="showCreateDialog" class="dialog-overlay" @click.self="showCreateDialog = false">
       <div class="dialog">
         <div class="dialog-header">
-          <h3>{{ $t('settings.knowledge.createSource') }}</h3>
+          <h3>{{ $t('knowledgeSearch.createSource') }}</h3>
           <button class="close-btn" @click="showCreateDialog = false">
             <component :is="XIcon" :size="20" />
           </button>
@@ -194,17 +194,17 @@
 
         <div class="dialog-body">
           <div class="form-group">
-            <label>{{ $t('settings.knowledge.sourceName') }}</label>
-            <input v-model="newSource.name" type="text" :placeholder="$t('settings.knowledge.namePlaceholder')" />
+            <label>{{ $t('knowledgeSearch.sourceName') }}</label>
+            <input v-model="newSource.name" type="text" :placeholder="$t('knowledgeSearch.namePlaceholder')" />
           </div>
 
           <div class="form-group">
-            <label>{{ $t('settings.knowledge.sourceType') }}</label>
+            <label>{{ $t('knowledgeSearch.sourceType') }}</label>
             <select v-model="newSource.source_type">
-              <option value="local">{{ $t('settings.knowledge.typeLocal') }}</option>
-              <option value="wiki">{{ $t('settings.knowledge.typeWiki') }}</option>
-              <option value="database">{{ $t('settings.knowledge.typeDatabase') }}</option>
-              <option value="api">{{ $t('settings.knowledge.typeApi') }}</option>
+              <option value="local">{{ $t('knowledgeSearch.typeLocal') }}</option>
+              <option value="wiki">{{ $t('knowledgeSearch.typeWiki') }}</option>
+              <option value="database">{{ $t('knowledgeSearch.typeDatabase') }}</option>
+              <option value="api">{{ $t('knowledgeSearch.typeApi') }}</option>
             </select>
           </div>
         </div>
@@ -273,10 +273,10 @@ const getSourceIcon = (type: string) => {
 
 const getSourceTypeLabel = (type: string) => {
   const labels: Record<string, string> = {
-    local: t('settings.knowledge.typeLocal'),
-    wiki: t('settings.knowledge.typeWiki'),
-    database: t('settings.knowledge.typeDatabase'),
-    api: t('settings.knowledge.typeApi')
+    local: t('knowledgeSearch.typeLocal'),
+    wiki: t('knowledgeSearch.typeWiki'),
+    database: t('knowledgeSearch.typeDatabase'),
+    api: t('knowledgeSearch.typeApi')
   }
   return labels[type] || type
 }
@@ -291,37 +291,37 @@ const loadSources = async () => {
     sources.value = await knowledgeApi.getSources()
   } catch (error) {
     console.error('Failed to load sources:', error)
-    toast.error(t('settings.knowledge.loadError'))
+    toast.error(t('knowledgeSearch.loadError'))
   }
 }
 
 const createSource = async () => {
   if (!newSource.value.name.trim()) {
-    toast.error(t('settings.knowledge.createError'))
+    toast.error(t('knowledgeSearch.createError'))
     return
   }
   try {
     await knowledgeApi.createSource(newSource.value.name, newSource.value.source_type)
-    toast.success(t('settings.knowledge.createSuccess'))
+    toast.success(t('knowledgeSearch.createSuccess'))
     await loadSources()
     showCreateDialog.value = false
     newSource.value = { name: '', source_type: 'local' }
   } catch (error) {
     console.error('Failed to create source:', error)
-    toast.error(t('settings.knowledge.createError'))
+    toast.error(t('knowledgeSearch.createError'))
   }
 }
 
 const deleteSource = async (id: string) => {
-  if (!confirm(t('settings.knowledge.confirmDelete'))) return
+  if (!confirm(t('knowledgeSearch.confirmDelete'))) return
 
   try {
     await knowledgeApi.deleteSource(id)
     sources.value = sources.value.filter(s => s.id !== id)
-    toast.success(t('settings.knowledge.deleteSuccess'))
+    toast.success(t('knowledgeSearch.deleteSuccess'))
   } catch (error) {
     console.error('Failed to delete source:', error)
-    toast.error(t('settings.knowledge.deleteError'))
+    toast.error(t('knowledgeSearch.deleteError'))
   }
 }
 
@@ -342,11 +342,11 @@ const handleFileUpload = async (event: Event) => {
 
   try {
     const result = await knowledgeApi.addDocument(uploadingSourceId.value, file)
-    toast.success(t('settings.knowledge.uploadSuccess', { count: result.chunks_added }))
+    toast.success(t('knowledgeSearch.uploadSuccess', { count: result.chunks_added }))
     await loadSources()
   } catch (error) {
     console.error('Failed to upload document:', error)
-    toast.error(t('settings.knowledge.uploadError'))
+    toast.error(t('knowledgeSearch.uploadError'))
   }
 
   // Reset
@@ -432,7 +432,7 @@ const testRetrieve = async () => {
     testResult.value = JSON.stringify(result, null, 2)
   } catch (error) {
     console.error('Failed to retrieve:', error)
-    toast.error(t('settings.knowledge.retrieveError'))
+    toast.error(t('knowledgeSearch.retrieveError'))
     testResult.value = 'Error: ' + error
   } finally {
     testing.value = false
