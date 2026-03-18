@@ -1,0 +1,53 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "**/node_modules/**"
+    },
+    {
+      "pattern": "**/.venv/**"
+    },
+    {
+      "pattern": "**/dist/**"
+    },
+    {
+      "pattern": "**/build/**"
+    },
+    {
+      "pattern": "**/*.min.js"
+    },
+    {
+      "pattern": "**/*.lock"
+    },
+    {
+      "pattern": "data/**"
+    },
+    {
+      "pattern": "memory/**"
+    },
+    {
+      "pattern": "workspace/**"
+    }
+  ],
+  "replacementPatterns": [
+    {
+      "pattern": "^/",
+      "replacement": "{{BASEURL}}/"
+    }
+  ],
+  "httpHeaders": [
+    {
+      "urls": ["https://github.com/", "https://guides.github.com/", "https://help.github.com/", "https://docs.github.com/"],
+      "headers": {
+        "Accept": "text/html"
+      }
+    }
+  ],
+  "timeout": "180s",
+  "retryOn429": true,
+  "retryCount": 3,
+  "fallbackRetryDelay": "30s",
+  "aliveStatusCodes": [
+    200,
+    429
+  ]
+}

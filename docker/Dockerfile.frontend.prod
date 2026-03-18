@@ -1,0 +1,35 @@
+# ===========================================
+# AIE 前端生产 Dockerfile
+# ===========================================
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+# 构建生产版本
+RUN npm run build
+
+# ===========================================
+# Nginx 生产镜像
+# ===========================================
+FROM nginx:alpine
+
+# 复制自定义配置
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+# 复制构建产物
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# 暴露端口
+EXPOSE 80
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD curl -f http://localhost/ || exit 1
+
+# 启动 Nginx
+CMD ["nginx", "-g", "daemon off;"]

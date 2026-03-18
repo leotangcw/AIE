@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # AIE - AI 办公助手
 
 ## 项目概述
@@ -69,12 +73,91 @@ AIE/
 ├── scripts/                   # 脚本
 ├── memory/                    # 记忆存储
 ├── resources/                 # 资源文件
-└── CLAUDE.md                 # 本文件
+└── config/                    # 配置文件
 ```
 
 ---
 
-## 功能规划
+## 核心架构
+
+### Application Structure
+The application follows a modular architecture with the main components:
+
+- **Backend (FastAPI)**: Main server application with API endpoints
+- **WebSocket**: Real-time communication for chat functionality
+- **Channel Manager**: Handles integration with various messaging platforms (QQ, DingTalk, Feishu, Telegram)
+- **Agent Loop**: Core AI processing loop that handles conversations
+- **Memory Store**: Persistent storage for conversation history and context
+- **Tool Registry**: Extensible tool system for AI actions
+- **Cron System**: Scheduled task execution
+
+### Component Flow
+1. Requests come through API routes or WebSocket connections
+2. Authentication middleware validates access
+3. ChannelMessageHandler processes incoming messages
+4. AgentLoop with LiteLLMProvider processes AI interactions
+5. Tool registry enables AI to execute various functions
+6. Results are delivered back via appropriate channels
+
+### Configuration System
+- Centralized configuration loader using Pydantic Settings
+- Environment-based configuration with .env support
+- Dynamic reloading of configuration changes
+
+---
+
+## Development Commands
+
+### Running the Application
+```bash
+# Start in development mode
+python start_dev.py
+
+# Start in production mode (opens browser automatically)
+python start_app.py
+
+# Start desktop app
+python start_desktop.py
+
+# For AIE-specific startup
+python start_aie.py
+```
+
+### Environment Setup
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env file from example
+cp .env.example .env
+# Then edit .env with your configuration
+```
+
+### Database Management
+```bash
+# Initialize database
+# Database initialization happens automatically on startup
+
+# Run migrations (if using alembic)
+alembic upgrade head
+```
+
+---
+
+## Key Files and Their Roles
+
+- `backend/app.py`: Main FastAPI application with lifecycle management
+- `start_app.py`: Production startup script with browser auto-open
+- `start_dev.py`: Development mode with hot reloading
+- `backend/api/*.py`: Individual API route definitions
+- `backend/modules/agent/loop.py`: Core AI processing loop
+- `backend/modules/providers/litellm_provider.py`: LLM provider abstraction
+- `backend/modules/tools/setup.py`: Tool registration system
+- `backend/ws/connection.py`: WebSocket connection handling
+
+---
+
+## Features
 
 ### Phase 1: 基础功能 (基于 CountBot)
 - [x] 智能对话
@@ -124,37 +207,11 @@ chore: 构建/工具
 
 ---
 
-## 依赖说明
+## Security Features
 
-### 核心依赖
-```
-fastapi>=0.115.0
-uvicorn[standard]>=0.32.0
-sqlalchemy>=2.0.36
-pydantic>=2.10.0
-litellm>=1.50.0
-```
-
-### 开发依赖
-```
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
-black>=24.0.0
-ruff>=0.3.0
-```
-
----
-
-## 参考资源
-
-- CountBot: `/mnt/d/code/AIE_0302/refcode/CountBot/`
-- OpenClaw: `/mnt/d/code/AIE_0302/refcode/openclaw/`
-
----
-
-## 待办事项
-
-- [ ] 初始化项目结构
-- [ ] 配置开发环境
-- [ ] 迁移 CountBot 基础代码
-- [ ] 验证基本功能
+- Remote authentication middleware
+- Command execution sandboxing
+- Dangerous command blocking
+- Audit logging capability
+- Rate limiting
+- Message deduplication

@@ -1,0 +1,56 @@
+# Labeler Configuration
+# PR 自动标签规则
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file: 'backend/**/*'
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: 'frontend/**/*'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: 'docs/**/*'
+      - changed-files:
+          - any-glob-to-any-file: '*.md'
+
+ci-cd:
+  - changed-files:
+      - any-glob-to-any-file: '.github/**/*'
+
+configuration:
+  - changed-files:
+      - any-glob-to-any-file: ['*.yaml', '*.yml', '*.toml', '*.ini', '*.env']
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: ['**/tests/**/*', '**/*.test.ts', '**/test_*.py']
+
+skills:
+  - changed-files:
+      - any-glob-to-any-file: 'skills/**/*'
+
+modules-agent:
+  - changed-files:
+      - any-glob-to-any-file: 'backend/modules/agent/**/*'
+
+modules-channels:
+  - changed-files:
+      - any-glob-to-any-file: 'backend/modules/channels/**/*'
+
+modules-tools:
+  - changed-files:
+      - any-glob-to-any-file: 'backend/modules/tools/**/*'
+
+modules-providers:
+  - changed-files:
+      - any-glob-to-any-file: 'backend/modules/providers/**/*'
+
+modules-memory:
+  - changed-files:
+      - any-glob-to-any-file: 'backend/modules/agent/memory.py'
+
+modules-skills:
+  - changed-files:
+      - any-glob-to-any-file: 'backend/modules/agent/skills.py'

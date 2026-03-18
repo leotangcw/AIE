@@ -1,0 +1,25 @@
+# ===========================================
+# AIE 前端开发 Dockerfile
+# ===========================================
+FROM node:20-slim
+
+# 设置工作目录
+WORKDIR /app
+
+# 环境变量
+ENV NODE_ENV=development
+
+# 复制 package.json
+COPY package*.json ./
+
+# 安装依赖
+RUN npm ci
+
+# 复制前端代码
+COPY . .
+
+# 暴露开发服务器端口
+EXPOSE 5173
+
+# 启动开发服务器
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
