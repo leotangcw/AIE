@@ -2,6 +2,7 @@
 /* KnowledgeHub API Client */
 
 import apiClient from './client'
+import { RetrievalMode, PromptStyle, SourceType } from '@/types/knowledge'
 
 export interface LLMConfig {
   enabled: boolean
@@ -10,7 +11,7 @@ export interface LLMConfig {
   base_url: string
   temperature: number
   max_tokens: number
-  prompt_style: string
+  prompt_style: PromptStyle
 }
 
 export interface CacheConfig {
@@ -22,7 +23,7 @@ export interface CacheConfig {
 export interface SourceConfig {
   id: string
   name: string
-  source_type: string
+  source_type: SourceType
   enabled: boolean
   priority: number
   config: Record<string, any>
@@ -30,7 +31,7 @@ export interface SourceConfig {
 
 export interface KnowledgeHubConfig {
   enabled: boolean
-  default_mode: 'direct' | 'llm' | 'hybrid'
+  default_mode: RetrievalMode
   llm: LLMConfig
   cache: CacheConfig
   sources: SourceConfig[]
@@ -39,7 +40,7 @@ export interface KnowledgeHubConfig {
 
 export interface RetrieveRequest {
   query: string
-  mode?: 'direct' | 'llm' | 'hybrid'
+  mode?: RetrievalMode
   top_k?: number
   source_ids?: string[]
 }
@@ -93,7 +94,7 @@ export const knowledgeHubApi = {
   // 创建知识源
   createSource: async (source: {
     name: string
-    source_type: string
+    source_type: SourceType
     config?: Record<string, any>
     enabled?: boolean
     priority?: number

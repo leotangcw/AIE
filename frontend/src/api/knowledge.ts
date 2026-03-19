@@ -1,11 +1,12 @@
 /* eslint-disable */
 /* Knowledge API Client */
 import apiClient from './client'
+import { SourceType } from '@/types/knowledge'
 
 export interface KnowledgeSource {
   id: string
   name: string
-  source_type: string
+  source_type: SourceType
   enabled: boolean
   created_at: string
   last_sync: string | null

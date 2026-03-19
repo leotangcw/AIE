@@ -11,6 +11,7 @@ export { default as LanguageSelector } from './LanguageSelector.vue'
 export { default as FileSelector } from './FileSelector.vue'
 export { default as DropZone } from './DropZone.vue'
 export { default as FilePreviewModal } from './FilePreviewModal.vue'
+export { default as ToggleSwitch } from './ToggleSwitch.vue'
 
 // 7.14 User Experience Components
 export { default as Skeleton } from './Skeleton.vue'
