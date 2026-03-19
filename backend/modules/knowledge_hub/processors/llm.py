@@ -15,7 +15,7 @@ class LLMProcessor(BaseProcessor):
         self.config = config
         self.client = None
 
-    async def process(self, query: str, chunks: list = None) -> KnowledgeResult:
+    async def process(self, query: str, chunks: list = None, **kwargs) -> KnowledgeResult:
         """LLM加工处理"""
         start_time = time.time()
 

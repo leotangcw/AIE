@@ -14,7 +14,7 @@ class DirectProcessor(BaseProcessor):
         super().__init__(config)
         self.retrievers = retrievers or {}
 
-    async def process(self, query: str, chunks: list = None) -> KnowledgeResult:
+    async def process(self, query: str, chunks: list = None, **kwargs) -> KnowledgeResult:
         """直接检索处理"""
         start_time = time.time()
 
