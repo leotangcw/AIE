@@ -22,6 +22,6 @@ class BaseProcessor(ABC):
         self.config = config
 
     @abstractmethod
-    async def process(self, query: str, chunks: list = None) -> KnowledgeResult:
+    async def process(self, query: str, chunks: list = None, **kwargs) -> KnowledgeResult:
         """处理知识"""
         pass
