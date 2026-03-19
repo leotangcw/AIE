@@ -31,6 +31,10 @@
     </div>
 
     <div class="source-footer">
+      <button v-if="source.source_type === 'local'" class="action-btn" @click="$emit('sync', source.id)">
+        <RefreshCw :size="16" />
+        {{ syncLabel }}
+      </button>
       <button class="action-btn" @click="$emit('upload', source.id)">
         <Upload :size="16" />
         {{ uploadLabel }}
@@ -52,7 +56,8 @@ import {
   Folder,
   Clock,
   Upload,
-  Trash
+  Trash,
+  RefreshCw
 } from 'lucide-vue-next'
 import { formatDate } from '@/utils/time'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -63,6 +68,7 @@ interface KnowledgeSource {
   source_type: string
   enabled: boolean
   last_sync: string | null
+  config?: Record<string, any>
 }
 
 interface Props {
@@ -75,6 +81,7 @@ defineEmits<{
   toggle: [source: KnowledgeSource]
   upload: [id: string]
   delete: [id: string]
+  sync: [id: string]
 }>()
 
 const { t } = useI18n()
@@ -82,6 +89,7 @@ const { t } = useI18n()
 const lastSyncLabel = computed(() => t('knowledgeSearch.lastSync'))
 const neverSyncedLabel = computed(() => t('knowledgeSearch.neverSynced'))
 const uploadLabel = computed(() => t('knowledgeSearch.uploadDocument'))
+const syncLabel = computed(() => t('knowledgeSearch.syncSource'))
 
 const getIcon = (type: string) => {
   const icons: Record<string, any> = {
