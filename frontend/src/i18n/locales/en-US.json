@@ -150,7 +150,9 @@
         "deleteError": "Failed to delete source",
         "uploadSuccess": "Document uploaded successfully, added {count} chunks",
         "uploadError": "Failed to upload document",
-        "retrieveError": "Retrieval failed"
+        "retrieveError": "Retrieval failed",
+        "browse": "Browse",
+        "pathHint": "Click Browse to select a folder"
     },
     "knowledgeHub": {
         "title": "Knowledge Hub",
