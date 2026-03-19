@@ -10,9 +10,10 @@ from .base import BaseProcessor, KnowledgeResult
 class DirectProcessor(BaseProcessor):
     """直接检索模式 - 快速返回原始结果"""
 
-    def __init__(self, config, retrievers=None):
+    def __init__(self, config, hub=None):
         super().__init__(config)
-        self.retrievers = retrievers or {}
+        self.hub = hub
+        self.retrievers = {}
 
     async def process(self, query: str, chunks: list = None, **kwargs) -> KnowledgeResult:
         """直接检索处理"""
@@ -38,13 +39,42 @@ class DirectProcessor(BaseProcessor):
     async def _retrieve_chunks(self, query: str) -> list:
         """检索知识块"""
         results = []
-        for name, retriever in self.retrievers.items():
-            try:
-                if hasattr(retriever, 'retrieve'):
-                    chunks = await retriever.retrieve(query)
-                    results.extend(chunks)
-            except Exception as e:
-                logger.warning(f"Retriever {name} failed: {e}")
+
+        # 如果有retrievers，使用retrievers
+        if self.retrievers:
+            for name, retriever in self.retrievers.items():
+                try:
+                    if hasattr(retriever, 'retrieve'):
+                        chunks = await retriever.retrieve(query)
+                        results.extend(chunks)
+                except Exception as e:
+                    logger.warning(f"Retriever {name} failed: {e}")
+        # 否则使用hub的connectors
+        elif self.hub and self.hub.connectors:
+            query_lower = query.lower()
+            for source_id, connector in self.hub.connectors.items():
+                try:
+                    if hasattr(connector, 'fetch'):
+                        docs = await connector.fetch(query)
+                        for doc in docs:
+                            # doc结构: {"source": ..., "content": [chunks], "path": ...}
+                            chunks = doc.get("content", [])
+                            for chunk in chunks:
+                                if query_lower in chunk.lower():
+                                    results.append({
+                                        "source": doc.get("source", "unknown"),
+                                        "content": chunk,
+                                        "source_id": source_id
+                                    })
+                except Exception as e:
+                    logger.warning(f"Connector {source_id} failed: {e}")
+
+        # 按相关性排序（简单策略：query出现次数越多越相关）
+        def score(item):
+            content = item.get("content", "").lower()
+            return content.count(query.lower())
+
+        results.sort(key=score, reverse=True)
         return results[:self.config.get("top_k", 10)]
 
     def _format_chunks(self, chunks: list) -> str:

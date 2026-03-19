@@ -41,7 +41,7 @@ class KnowledgeHub:
                 self.connectors[source.id] = LocalConnector(source.config)
 
         # 初始化处理器
-        self.processors["direct"] = DirectProcessor({"top_k": 10})
+        self.processors["direct"] = DirectProcessor({"top_k": 10}, self)
 
         self._initialized = True
 
