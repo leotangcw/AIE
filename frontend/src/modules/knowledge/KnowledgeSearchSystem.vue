@@ -17,60 +17,22 @@
         </div>
 
         <!-- Empty state -->
-        <div v-if="sources.length === 0" class="empty-state">
-          <component :is="BookOpenIcon" :size="48" class="empty-icon" />
-          <p>{{ $t('knowledgeSearch.empty') }}</p>
-        </div>
+        <EmptyState
+          v-if="sources.length === 0"
+          icon="book-open"
+          :title="$t('knowledgeSearch.empty')"
+        />
 
         <!-- Source cards -->
         <div v-else class="sources-grid">
-          <div
+          <KnowledgeSourceCard
             v-for="source in sources"
             :key="source.id"
-            class="source-card"
-            :class="{ disabled: !source.enabled }"
-          >
-            <div class="source-header">
-              <div class="source-icon">
-                <component :is="getSourceIcon(source.source_type)" :size="24" />
-              </div>
-              <div class="source-info">
-                <h4 class="source-name">{{ source.name }}</h4>
-                <span class="source-type-badge">{{ getSourceTypeLabel(source.source_type) }}</span>
-              </div>
-              <label class="toggle-switch">
-                <input
-                  :checked="source.enabled"
-                  type="checkbox"
-                  @change="toggleSource(source)"
-                >
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-
-            <div class="source-body">
-              <div class="source-meta">
-                <span v-if="source.last_sync" class="meta-item">
-                  <component :is="ClockIcon" :size="14" />
-                  {{ $t('knowledgeSearch.lastSync') }}: {{ formatDate(source.last_sync) }}
-                </span>
-                <span v-else class="meta-item">
-                  <component :is="ClockIcon" :size="14" />
-                  {{ $t('knowledgeSearch.neverSynced') }}
-                </span>
-              </div>
-            </div>
-
-            <div class="source-footer">
-              <button class="action-btn" @click="uploadDocument(source.id)">
-                <component :is="UploadIcon" :size="16" />
-                {{ $t('knowledgeSearch.uploadDocument') }}
-              </button>
-              <button class="action-btn danger" @click="deleteSource(source.id)">
-                <component :is="TrashIcon" :size="16" />
-              </button>
-            </div>
-          </div>
+            :source="source"
+            @toggle="toggleSource"
+            @upload="uploadDocument"
+            @delete="deleteSource"
+          />
         </div>
       </div>
     </div>
@@ -183,44 +145,39 @@
     </div>
 
     <!-- Create Source Dialog -->
-    <div v-if="showCreateDialog" class="dialog-overlay" @click.self="showCreateDialog = false">
-      <div class="dialog">
-        <div class="dialog-header">
-          <h3>{{ $t('knowledgeSearch.createSource') }}</h3>
-          <button class="close-btn" @click="showCreateDialog = false">
-            <component :is="XIcon" :size="20" />
-          </button>
-        </div>
-
-        <div class="dialog-body">
-          <div class="form-group">
-            <label>{{ $t('knowledgeSearch.sourceName') }}</label>
-            <input v-model="newSource.name" type="text" :placeholder="$t('knowledgeSearch.namePlaceholder')" />
-          </div>
-
-          <div class="form-group">
-            <label>{{ $t('knowledgeSearch.sourceType') }}</label>
-            <select v-model="newSource.source_type">
-              <option value="local">{{ $t('knowledgeSearch.typeLocal') }}</option>
-              <option value="wiki">{{ $t('knowledgeSearch.typeWiki') }}</option>
-              <option value="database">{{ $t('knowledgeSearch.typeDatabase') }}</option>
-              <option value="api">{{ $t('knowledgeSearch.typeApi') }}</option>
-            </select>
-          </div>
-
-          <!-- 本地文档需要输入目录路径 -->
-          <div v-if="newSource.source_type === 'local'" class="form-group">
-            <label>{{ $t('knowledgeSearch.localPath') }}</label>
-            <input v-model="newSource.config.path" type="text" :placeholder="$t('knowledgeSearch.localPathPlaceholder')" />
-          </div>
-        </div>
-
-        <div class="dialog-footer">
-          <button class="btn secondary" @click="showCreateDialog = false">{{ $t('common.cancel') }}</button>
-          <button class="btn primary" @click="createSource">{{ $t('common.save') }}</button>
-        </div>
+    <Modal
+      v-model="showCreateDialog"
+      :title="$t('knowledgeSearch.createSource')"
+      size="small"
+      @confirm="createSource"
+    >
+      <div class="form-group">
+        <label>{{ $t('knowledgeSearch.sourceName') }}</label>
+        <input v-model="newSource.name" type="text" :placeholder="$t('knowledgeSearch.namePlaceholder')" />
       </div>
-    </div>
+
+      <div class="form-group">
+        <label>{{ $t('knowledgeSearch.sourceType') }}</label>
+        <select v-model="newSource.source_type">
+          <option value="local">{{ $t('knowledgeSearch.typeLocal') }}</option>
+          <option value="wiki">{{ $t('knowledgeSearch.typeWiki') }}</option>
+          <option value="database">{{ $t('knowledgeSearch.typeDatabase') }}</option>
+          <option value="api">{{ $t('knowledgeSearch.typeApi') }}</option>
+          <option value="web">{{ $t('knowledgeSearch.typeWeb') }}</option>
+        </select>
+      </div>
+
+      <!-- 本地文档需要输入目录路径 -->
+      <div v-if="newSource.source_type === 'local'" class="form-group">
+        <label>{{ $t('knowledgeSearch.localPath') }}</label>
+        <input v-model="newSource.config.path" type="text" :placeholder="$t('knowledgeSearch.localPathPlaceholder')" />
+      </div>
+
+      <template #footer>
+        <button class="btn secondary" @click="showCreateDialog = false">{{ $t('common.cancel') }}</button>
+        <button class="btn primary" @click="createSource">{{ $t('common.save') }}</button>
+      </template>
+    </Modal>
 
     <!-- File Upload Input -->
     <input
@@ -237,20 +194,13 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  Plus as PlusIcon,
-  BookOpen as BookOpenIcon,
-  FileText as FileTextIcon,
-  Database as DatabaseIcon,
-  Globe as GlobeIcon,
-  Clock as ClockIcon,
-  Upload as UploadIcon,
-  Trash as TrashIcon,
-  X as XIcon,
-  Folder as FolderIcon
+  Plus as PlusIcon
 } from 'lucide-vue-next'
-import knowledgeApi, { type KnowledgeSource, type KnowledgeChunk } from '@/api/knowledge'
-import knowledgeHubApi, { type KnowledgeHubConfig, type RetrieveResult } from '@/api/knowledgeHub'
+import knowledgeApi, { type KnowledgeSource } from '@/api/knowledge'
+import knowledgeHubApi, { type KnowledgeHubConfig } from '@/api/knowledgeHub'
 import { useToast } from '@/composables/useToast'
+import { EmptyState, Modal } from '@/components/ui'
+import KnowledgeSourceCard from '@/components/knowledge/KnowledgeSourceCard.vue'
 
 const { t } = useI18n()
 const toast = useToast()
@@ -269,31 +219,6 @@ const newSource = ref({
 })
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploadingSourceId = ref<string | null>(null)
-
-const getSourceIcon = (type: string) => {
-  const icons: Record<string, any> = {
-    local: FolderIcon,
-    wiki: GlobeIcon,
-    database: DatabaseIcon,
-    api: GlobeIcon
-  }
-  return icons[type] || FileTextIcon
-}
-
-const getSourceTypeLabel = (type: string) => {
-  const labels: Record<string, string> = {
-    local: t('knowledgeSearch.typeLocal'),
-    wiki: t('knowledgeSearch.typeWiki'),
-    database: t('knowledgeSearch.typeDatabase'),
-    api: t('knowledgeSearch.typeApi')
-  }
-  return labels[type] || type
-}
-
-const formatDate = (dateStr: string) => {
-  const date = new Date(dateStr)
-  return date.toLocaleString()
-}
 
 const loadSources = async () => {
   try {
@@ -456,10 +381,9 @@ const testRetrieve = async () => {
   }
 }
 
-// Initialize
-onMounted(() => {
-  loadSources()
-  loadConfig()
+// Initialize - parallelize API calls
+onMounted(async () => {
+  await Promise.all([loadSources(), loadConfig()])
 })
 </script>
 
@@ -535,20 +459,6 @@ onMounted(() => {
 
 .add-btn:hover {
   background: var(--color-primary-hover);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px;
-  color: var(--color-text-tertiary);
-}
-
-.empty-icon {
-  margin-bottom: 16px;
-  opacity: 0.5;
 }
 
 .sources-grid {
@@ -825,75 +735,5 @@ onMounted(() => {
   margin: 0;
   font-size: 12px;
   white-space: pre-wrap;
-}
-
-/* Dialog */
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 16px;
-}
-
-.dialog {
-  background: var(--color-bg-primary);
-  border-radius: 8px;
-  width: 100%;
-  max-width: 400px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-}
-
-.dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  border-bottom: 1px solid var(--color-border-primary);
-}
-
-.dialog-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-}
-
-.dialog-body {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.dialog-body .form-group {
-  margin-bottom: 0;
-}
-
-.dialog-body .form-group label {
-  margin-bottom: 6px;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 16px;
-  border-top: 1px solid var(--color-border-primary);
 }
 </style>

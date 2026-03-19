@@ -277,23 +277,36 @@ class BM25Retriever:
         self.avg_doc_length: float = 0
         self.k1 = 1.5
         self.b = 0.75
+        self._idf_cache: dict[str, float] = {}  # 缓存 IDF 值
+        self._doc_terms_cache: dict[str, tuple[list[str], Counter]] = {}  # 缓存文档词项
 
     def add_chunks(self, chunks: list[KnowledgeChunk]):
-        """添加知识块"""
+        """添加知识块并预计算 IDF"""
         self.chunks = chunks
         self.doc_lengths = [len(c.content) for c in chunks]
         self.avg_doc_length = sum(self.doc_lengths) / len(self.doc_lengths) if self.doc_lengths else 1
+        # 清除缓存
+        self._idf_cache.clear()
+        self._doc_terms_cache.clear()
+        # 预计算所有文档的词项
+        for chunk in chunks:
+            doc_terms = self._tokenize(chunk.content)
+            self._doc_terms_cache[chunk.id] = (doc_terms, Counter(doc_terms))
 
     def _tokenize(self, text: str) -> list[str]:
         """分词"""
         return re.findall(r'\w+', text.lower())
 
     def _calculate_idf(self, term: str) -> float:
-        """计算 IDF"""
+        """计算 IDF（带缓存）"""
+        if term in self._idf_cache:
+            return self._idf_cache[term]
         containing_docs = sum(1 for chunk in self.chunks if term in chunk.content.lower())
         if containing_docs == 0:
             return 0
-        return math.log((len(self.chunks) - containing_docs + 0.5) / (containing_docs + 0.5) + 1)
+        idf = math.log((len(self.chunks) - containing_docs + 0.5) / (containing_docs + 0.5) + 1)
+        self._idf_cache[term] = idf
+        return idf
 
     def retrieve(self, query: str, top_k: int = 5) -> list[KnowledgeRef]:
         """BM25 检索"""
@@ -304,8 +317,13 @@ class BM25Retriever:
         scores = []
 
         for i, chunk in enumerate(self.chunks):
-            doc_terms = self._tokenize(chunk.content)
-            doc_tf = Counter(doc_terms)
+            # 使用缓存的词项
+            cached = self._doc_terms_cache.get(chunk.id)
+            if cached:
+                doc_terms, doc_tf = cached
+            else:
+                doc_terms = self._tokenize(chunk.content)
+                doc_tf = Counter(doc_terms)
 
             score = 0.0
             for term in query_terms:
@@ -338,10 +356,15 @@ class VectorRetriever:
 
     def __init__(self):
         self.chunks: list[KnowledgeChunk] = []
+        self._chunk_embeddings: dict[str, list[float]] = {}  # 缓存 chunk embeddings
 
     def add_chunks(self, chunks: list[KnowledgeChunk]):
-        """添加知识块"""
+        """添加知识块并预计算 embeddings"""
         self.chunks = chunks
+        # 预计算所有 chunk 的 embeddings
+        self._chunk_embeddings.clear()
+        for chunk in chunks:
+            self._chunk_embeddings[chunk.id] = self._simple_embed(chunk.content)
 
     def _simple_embed(self, text: str) -> list[float]:
         """简化版 embedding - 使用词频向量"""
@@ -372,8 +395,11 @@ class VectorRetriever:
         scores = []
 
         for chunk in self.chunks:
-            # 简化：每次重新计算（生产环境应该缓存）
-            chunk_vec = self._simple_embed(chunk.content)
+            # 使用缓存的 embedding
+            chunk_vec = self._chunk_embeddings.get(chunk.id)
+            if chunk_vec is None:
+                chunk_vec = self._simple_embed(chunk.content)
+                self._chunk_embeddings[chunk.id] = chunk_vec
             score = self._cosine_similarity(query_vec, chunk_vec)
             if score > 0.01:  # 阈值过滤
                 scores.append((score, chunk))

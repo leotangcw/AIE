@@ -47,7 +47,9 @@ class KnowledgeHub:
 
     async def retrieve(self, query: str, mode: str = None, **options) -> KnowledgeResult:
         """检索知识"""
-        await self.initialize()
+        # 只在未初始化时调用，避免每次检索的开销
+        if not self._initialized:
+            await self.initialize()
 
         mode = mode or self.config.default_mode
         processor = self.processors.get(mode) or self.processors.get("direct")

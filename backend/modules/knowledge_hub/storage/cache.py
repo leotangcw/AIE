@@ -17,9 +17,39 @@ class SimpleCache:
         self.config = config
         self.ttl = config.ttl if config else 3600
         self.max_items = config.max_memory_items if config else 100
+        self.max_file_items = 1000  # 文件缓存最大条目数
 
         self._memory = {}
         self._access_time = {}
+
+        # 初始化时清理过期文件
+        self._cleanup_expired_files()
+
+    def _cleanup_expired_files(self):
+        """清理过期的缓存文件"""
+        try:
+            current_time = time.time()
+            expired_files = []
+            for f in self.cache_dir.glob("*.json"):
+                try:
+                    data = json.loads(f.read_text(encoding="utf-8"))
+                    if current_time - data.get("timestamp", 0) >= self.ttl:
+                        expired_files.append(f)
+                except Exception:
+                    expired_files.append(f)
+
+            # 如果过期文件过多，删除最旧的
+            if len(expired_files) > self.max_file_items:
+                expired_files.sort(key=lambda f: f.stat().st_mtime)
+                expired_files = expired_files[:len(expired_files) - self.max_file_items]
+
+            for f in expired_files:
+                try:
+                    f.unlink()
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f"Cache cleanup failed: {e}")
 
     def get(self, key: str) -> Optional[str]:
         """获取缓存"""
@@ -40,6 +70,12 @@ class SimpleCache:
                     self._memory[key] = data["content"]
                     self._access_time[key] = data["timestamp"]
                     return data["content"]
+                else:
+                    # 已过期，删除文件
+                    try:
+                        cache_file.unlink()
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
@@ -50,7 +86,7 @@ class SimpleCache:
         self._memory[key] = value
         self._access_time[key] = time.time()
 
-        # 简单内存淘汰
+        # 简单内存淘汰 - 使用 list 而非 OrderedDict 以保持简单
         if len(self._memory) > self.max_items:
             oldest_key = min(self._access_time, key=self._access_time.get)
             del self._memory[oldest_key]

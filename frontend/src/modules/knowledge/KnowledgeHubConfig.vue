@@ -110,8 +110,10 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import knowledgeHubApi, { type KnowledgeHubConfig } from '@/api/knowledgeHub'
+import { useToast } from '@/composables/useToast'
 
 const { t } = useI18n()
+const toast = useToast()
 
 const config = ref<KnowledgeHubConfig>({
   enabled: true,
@@ -164,7 +166,7 @@ const updateConfig = async () => {
 const refreshCache = async () => {
   try {
     await knowledgeHubApi.refreshCache()
-    alert(t('knowledgeHub.cacheRefreshed'))
+    toast.success(t('knowledgeHub.cacheRefreshed'))
   } catch (error) {
     console.error('Failed to refresh cache:', error)
   }
