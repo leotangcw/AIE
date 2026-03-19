@@ -478,7 +478,9 @@
             "deleteError": "删除检索源失败",
             "uploadSuccess": "文档上传成功，已添加 {count} 个知识块",
             "uploadError": "上传文档失败",
-            "retrieveError": "检索失败"
+            "retrieveError": "检索失败",
+            "browse": "浏览",
+            "pathHint": "点击浏览按钮选择文件夹"
         },
         "saveSuccess": "设置保存成功",
         "saveError": "保存设置失败",

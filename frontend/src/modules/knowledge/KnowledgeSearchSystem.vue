@@ -170,7 +170,14 @@
       <!-- 本地文档需要输入目录路径 -->
       <div v-if="newSource.source_type === 'local'" class="form-group">
         <label>{{ $t('knowledgeSearch.localPath') }}</label>
-        <input v-model="newSource.config.path" type="text" :placeholder="$t('knowledgeSearch.localPathPlaceholder')" />
+        <div class="path-input-group">
+          <input v-model="newSource.config.path" type="text" :placeholder="$t('knowledgeSearch.localPathPlaceholder')" readonly />
+          <button class="btn secondary" @click="selectFolder">
+            <FolderOpen :size="16" />
+            {{ $t('knowledgeSearch.browse') }}
+          </button>
+        </div>
+        <p class="path-hint">{{ $t('knowledgeSearch.pathHint') }}</p>
       </div>
 
       <template #footer>
@@ -187,6 +194,15 @@
       style="display: none"
       @change="handleFileUpload"
     />
+
+    <!-- Folder Picker Input -->
+    <input
+      ref="folderInput"
+      type="file"
+      webkitdirectory
+      style="display: none"
+      @change="handleFolderSelect"
+    />
   </div>
 </template>
 
@@ -194,7 +210,8 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  Plus as PlusIcon
+  Plus as PlusIcon,
+  FolderOpen as FolderOpenIcon
 } from 'lucide-vue-next'
 import knowledgeApi, { type KnowledgeSource } from '@/api/knowledge'
 import knowledgeHubApi, { type KnowledgeHubConfig } from '@/api/knowledgeHub'
@@ -218,6 +235,7 @@ const newSource = ref({
   }
 })
 const fileInput = ref<HTMLInputElement | null>(null)
+const folderInput = ref<HTMLInputElement | null>(null)
 const uploadingSourceId = ref<string | null>(null)
 
 const loadSources = async () => {
@@ -252,6 +270,45 @@ const createSource = async () => {
     console.error('Failed to create source:', error)
     toast.error(t('knowledgeSearch.createError'))
   }
+}
+
+const selectFolder = () => {
+  folderInput.value?.click()
+}
+
+const handleFolderSelect = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const files = target.files
+  if (!files || files.length === 0) return
+
+  // Get the first selected item's path (webkitRelativePath contains the directory)
+  const firstFile = files[0]
+  let folderPath = ''
+
+  // Try to get path from webkitRelativePath (format: "folder_name/file.txt")
+  if (firstFile.webkitRelativePath) {
+    const parts = firstFile.webkitRelativePath.split('/')
+    if (parts.length > 0) {
+      // Get the directory path from the first file
+      // We need to find the common parent directory
+      const dirParts = parts.slice(0, -1)
+      if (dirParts.length > 0) {
+        folderPath = dirParts.join('/')
+      }
+    }
+  }
+
+  // Fallback: construct path from the File object's name and the relative path
+  // For security reasons, browsers may not expose full paths, but we try our best
+  if (!folderPath && firstFile.webkitRelativePath) {
+    folderPath = firstFile.webkitRelativePath.replace(/\/[^\/]+$/, '')
+  }
+
+  // Update the path in newSource
+  newSource.value.config.path = folderPath || firstFile.name
+
+  // Reset input
+  target.value = ''
 }
 
 const deleteSource = async (id: string) => {
@@ -618,6 +675,28 @@ onMounted(async () => {
   padding: 8px 12px;
   border: 1px solid var(--color-border-primary);
   border-radius: 6px;
+}
+
+.path-input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.path-input-group input {
+  flex: 1;
+}
+
+.path-input-group .btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.path-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
 }
 
 .toggle-label {
