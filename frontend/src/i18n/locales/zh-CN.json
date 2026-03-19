@@ -154,7 +154,10 @@
         "deleteError": "删除检索源失败",
         "uploadSuccess": "文档上传成功，已添加 {count} 个知识块",
         "uploadError": "上传文档失败",
-        "retrieveError": "检索失败"
+        "retrieveError": "检索失败",
+            "syncSource": "同步",
+            "syncSuccess": "同步成功",
+            "syncError": "同步失败"
     },
     "knowledgeHub": {
         "title": "知识中枢",
@@ -481,6 +484,9 @@
             "uploadSuccess": "文档上传成功，已添加 {count} 个知识块",
             "uploadError": "上传文档失败",
             "retrieveError": "检索失败",
+            "syncSource": "同步",
+            "syncSuccess": "同步成功",
+            "syncError": "同步失败",
             "browse": "浏览",
             "pathHint": "点击浏览按钮选择文件夹"
         },
@@ -829,6 +835,9 @@
             "uploadSuccess": "文档上传成功，已添加 {count} 个知识块",
             "uploadError": "上传文档失败",
             "retrieveError": "检索失败",
+            "syncSource": "同步",
+            "syncSuccess": "同步成功",
+            "syncError": "同步失败",
             "browse": "浏览",
             "pathHint": "点击浏览按钮选择文件夹"
         },

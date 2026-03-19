@@ -32,6 +32,7 @@
             @toggle="toggleSource"
             @upload="uploadDocument"
             @delete="deleteSource"
+            @sync="syncSource"
           />
         </div>
       </div>
@@ -318,6 +319,18 @@ const deleteSource = async (id: string) => {
   }
 }
 
+const syncSource = async (sourceId: string) => {
+  try {
+    const result = await knowledgeHubApi.syncSource(sourceId)
+    toast.success(t('knowledgeSearch.syncSuccess'))
+    await loadSources()
+  } catch (error: any) {
+    console.error('Failed to sync source:', error)
+    const errorMsg = error?.response?.data?.detail || error?.message || error?.toString() || 'Unknown error'
+    toast.error(t('knowledgeSearch.syncError') + ': ' + errorMsg)
+  }
+}
+
 const toggleSource = async (source: KnowledgeSource) => {
   // Toggle is handled by backend - just reload
   await loadSources()
@@ -423,10 +436,11 @@ const testRetrieve = async () => {
       top_k: 5
     })
     testResult.value = JSON.stringify(result, null, 2)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to retrieve:', error)
+    const errorMsg = error?.response?.data?.detail || error?.message || error?.toString() || 'Unknown error'
     toast.error(t('knowledgeSearch.retrieveError'))
-    testResult.value = 'Error: ' + error
+    testResult.value = 'Error: ' + errorMsg
   } finally {
     testing.value = false
   }
