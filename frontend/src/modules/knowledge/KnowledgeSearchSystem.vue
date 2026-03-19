@@ -60,10 +60,7 @@
       <div class="form-group">
         <label class="toggle-label">
           <span>{{ $t('knowledgeHub.enableLLM') }}</span>
-          <label class="toggle-switch">
-            <input type="checkbox" v-model="config.llm.enabled" @change="updateConfig" />
-            <span class="toggle-slider"></span>
-          </label>
+          <ToggleSwitch v-model="config.llm.enabled" @update:model-value="updateConfig" />
         </label>
       </div>
 
@@ -107,14 +104,11 @@
       <div class="form-group">
         <label class="toggle-label">
           <span>{{ $t('knowledgeHub.enableCache') }}</span>
-          <label class="toggle-switch">
-            <input type="checkbox" v-model="config.cache.enabled" @change="updateConfig" />
-            <span class="toggle-slider"></span>
-          </label>
+          <ToggleSwitch v-model="config.cache.enabled" @update:model-value="updateConfig" />
         </label>
       </div>
       <div class="form-group">
-        <label>{{ $t('knowledgeHub.cacheTTL') }} (秒)</label>
+        <label>{{ $t('knowledgeHub.cacheTTL') }} ({{ $t('knowledgeHub.cacheTTLUnit') }})</label>
         <input v-model.number="config.cache.ttl" type="number" @change="updateConfig" />
       </div>
       <button class="btn secondary" @click="refreshCache">
@@ -216,7 +210,7 @@ import {
 import knowledgeApi, { type KnowledgeSource } from '@/api/knowledge'
 import knowledgeHubApi, { type KnowledgeHubConfig } from '@/api/knowledgeHub'
 import { useToast } from '@/composables/useToast'
-import { EmptyState, Modal } from '@/components/ui'
+import { EmptyState, Modal, ToggleSwitch } from '@/components/ui'
 import KnowledgeSourceCard from '@/components/knowledge/KnowledgeSourceCard.vue'
 
 const { t } = useI18n()
@@ -703,47 +697,6 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.toggle-switch {
-  position: relative;
-  width: 44px;
-  height: 24px;
-}
-
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  inset: 0;
-  background-color: var(--color-border-secondary);
-  border-radius: 24px;
-  transition: 0.3s;
-}
-
-.toggle-slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  border-radius: 50%;
-  transition: 0.3s;
-}
-
-.toggle-switch input:checked + .toggle-slider {
-  background-color: var(--color-success);
-}
-
-.toggle-switch input:checked + .toggle-slider:before {
-  transform: translateX(20px);
 }
 
 .btn {

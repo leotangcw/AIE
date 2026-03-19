@@ -21,9 +21,7 @@ class SimpleCache:
 
         self._memory = {}
         self._access_time = {}
-
-        # 初始化时清理过期文件
-        self._cleanup_expired_files()
+        self._cleanup_done = False
 
     def _cleanup_expired_files(self):
         """清理过期的缓存文件"""
@@ -51,8 +49,15 @@ class SimpleCache:
         except Exception as e:
             logger.warning(f"Cache cleanup failed: {e}")
 
+    def _ensure_cleanup(self):
+        """延迟清理 - 仅在第一次访问时执行"""
+        if not self._cleanup_done:
+            self._cleanup_expired_files()
+            self._cleanup_done = True
+
     def get(self, key: str) -> Optional[str]:
         """获取缓存"""
+        self._ensure_cleanup()
         # 1. 先查内存
         if key in self._memory:
             if time.time() - self._access_time[key] < self.ttl:
@@ -63,26 +68,26 @@ class SimpleCache:
 
         # 2. 再查文件
         cache_file = self.cache_dir / f"{hash(key)}.json"
-        if cache_file.exists():
-            try:
-                data = json.loads(cache_file.read_text(encoding="utf-8"))
-                if time.time() - data.get("timestamp", 0) < self.ttl:
-                    self._memory[key] = data["content"]
-                    self._access_time[key] = data["timestamp"]
-                    return data["content"]
-                else:
-                    # 已过期，删除文件
-                    try:
-                        cache_file.unlink()
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+        try:
+            data = json.loads(cache_file.read_text(encoding="utf-8"))
+            if time.time() - data.get("timestamp", 0) < self.ttl:
+                self._memory[key] = data["content"]
+                self._access_time[key] = data["timestamp"]
+                return data["content"]
+            else:
+                # 已过期，删除文件
+                try:
+                    cache_file.unlink()
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         return None
 
     def set(self, key: str, value: str, ttl: int = None):
         """设置缓存"""
+        self._ensure_cleanup()
         self._memory[key] = value
         self._access_time[key] = time.time()
 
