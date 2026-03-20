@@ -39,9 +39,12 @@ class DirectProcessor(BaseProcessor):
     async def _retrieve_chunks(self, query: str) -> list:
         """检索知识块"""
         results = []
+        logger.info(f"_retrieve_chunks called with query: {query}")
+        logger.info(f"self.hub.connectors: {self.hub.connectors if self.hub else 'hub is None'}")
 
         # 如果有retrievers，使用retrievers
         if self.retrievers:
+            logger.info(f"Using retrievers: {self.retrievers}")
             for name, retriever in self.retrievers.items():
                 try:
                     if hasattr(retriever, 'retrieve'):
@@ -51,14 +54,17 @@ class DirectProcessor(BaseProcessor):
                     logger.warning(f"Retriever {name} failed: {e}")
         # 否则使用hub的connectors
         elif self.hub and self.hub.connectors:
+            logger.info(f"Using connectors, count: {len(self.hub.connectors)}")
             query_lower = query.lower()
             for source_id, connector in self.hub.connectors.items():
                 try:
                     if hasattr(connector, 'fetch'):
                         docs = await connector.fetch(query)
+                        logger.info(f"Connector {source_id} returned {len(docs)} docs")
                         for doc in docs:
                             # doc结构: {"source": ..., "content": [chunks], "path": ...}
                             chunks = doc.get("content", [])
+                            logger.info(f"Doc {doc.get('source')} has {len(chunks)} chunks")
                             for chunk in chunks:
                                 if query_lower in chunk.lower():
                                     results.append({
@@ -66,8 +72,11 @@ class DirectProcessor(BaseProcessor):
                                         "content": chunk,
                                         "source_id": source_id
                                     })
+                        logger.info(f"After processing, results count: {len(results)}")
                 except Exception as e:
                     logger.warning(f"Connector {source_id} failed: {e}")
+        else:
+            logger.warning("No retrievers and no hub.connectors available")
 
         # 按相关性排序（简单策略：query出现次数越多越相关）
         def score(item):
