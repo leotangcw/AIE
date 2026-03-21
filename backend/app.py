@@ -291,6 +291,21 @@ async def lifespan(app: FastAPI):
     app.state.cron_scheduler = scheduler
     app.state.cron_executor = cron_executor
 
+    # 初始化 Gateway 心跳调度器
+    logger.info("Initializing heartbeat scheduler...")
+    from backend.modules.heartbeat.scheduler import HeartbeatScheduler
+    from backend.ws.connection import connection_manager
+
+    heartbeat_scheduler = HeartbeatScheduler(
+        db_session_factory=db_session_factory,
+        agent_loop=cron_agent,  # 复用 cron_agent
+        connection_manager=connection_manager,
+        workspace=shared["workspace"],
+    )
+    await heartbeat_scheduler.start()
+    app.state.heartbeat_scheduler = heartbeat_scheduler
+    logger.info("Heartbeat scheduler started")
+
     async def get_cron_service_for_tool():
         async with db_session_factory() as db:
             return CronService(db, scheduler=scheduler)
@@ -325,6 +340,13 @@ async def lifespan(app: FastAPI):
     logger.info("Initiating graceful shutdown...")
     await channel_manager.stop_all()
     await scheduler.stop()
+
+    # 停止心跳调度器
+    heartbeat_scheduler = getattr(app.state, "heartbeat_scheduler", None)
+    if heartbeat_scheduler:
+        await heartbeat_scheduler.stop()
+        logger.info("Heartbeat scheduler stopped")
+
     logger.info("Backend shutdown complete")
 
 
@@ -375,6 +397,7 @@ from backend.api.research import router as research_router
 from backend.api.plugins import router as plugins_router
 from backend.api.agent_teams import router as agent_teams_router
 from backend.api.task_items import router as task_items_router
+from backend.api.heartbeat import router as heartbeat_router
 from backend.modules.knowledge_hub.api import router as knowledge_hub_router
 
 app.include_router(auth_router)
@@ -398,6 +421,7 @@ app.include_router(research_router)
 app.include_router(plugins_router)
 app.include_router(agent_teams_router)
 app.include_router(task_items_router)
+app.include_router(heartbeat_router)
 app.include_router(knowledge_hub_router)
 
 

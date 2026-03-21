@@ -11,6 +11,12 @@
     </div>
     <div class="todo-items" :class="{ 'has-scroll': todos.length > 4 }">
       <div
+        v-if="todos.length === 0"
+        class="todo-empty"
+      >
+        {{ $t('todo.empty') || '暂无待办事项' }}
+      </div>
+      <div
         v-for="(todo, index) in todos"
         :key="todo.id"
         class="todo-item"
@@ -59,7 +65,6 @@ const getStatusIcon = (status: string): string => {
   border-radius: 8px;
   overflow: hidden;
   background: var(--bg-primary, #ffffff);
-  margin: var(--spacing-sm) 0;
 }
 
 .todo-list-header {

@@ -80,6 +80,7 @@ async def init_db() -> None:
     """初始化数据库"""
     # 导入所有模型以确保表被创建
     from backend.models import AgentTeam, CronJob, Message, Personality, Session, Setting, Task, TaskItem, ToolConversation  # noqa: F401
+    from backend.modules.heartbeat.models import HeartbeatTask  # noqa: F401
     from sqlalchemy import text
 
     async with engine.begin() as conn:

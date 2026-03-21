@@ -101,6 +101,13 @@ class TaskItem(Base):
         Index("idx_task_next_run", "next_run_at"),
     )
 
+    @staticmethod
+    def _utc_to_iso(dt: Optional[datetime]) -> Optional[str]:
+        """将 UTC datetime 转换为带 Z 后缀的 ISO 字符串，供前端正确解析为 UTC 时间"""
+        if not dt:
+            return None
+        return dt.isoformat() + "Z"
+
     def to_dict(self) -> dict:
         """转换为字典"""
         return {
@@ -113,20 +120,20 @@ class TaskItem(Base):
             "parent_id": self.parent_id,
             "cron_id": self.cron_id,
             "cron_expression": self.cron_expression,
-            "next_run_at": self.next_run_at.isoformat() if self.next_run_at else None,
+            "next_run_at": self._utc_to_iso(self.next_run_at),
             "last_run_status": self.last_run_status,
-            "last_run_at": self.last_run_at.isoformat() if self.last_run_at else None,
+            "last_run_at": self._utc_to_iso(self.last_run_at),
             "status": self.status,
             "progress": self.progress,
-            "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "started_at": self._utc_to_iso(self.started_at),
+            "completed_at": self._utc_to_iso(self.completed_at),
             "estimated_duration": self.estimated_duration,
             "actual_duration": self.actual_duration,
             "error_message": self.error_message,
             "retry_count": self.retry_count,
             "max_retries": self.max_retries,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": self._utc_to_iso(self.created_at),
+            "updated_at": self._utc_to_iso(self.updated_at),
         }
 
     @property

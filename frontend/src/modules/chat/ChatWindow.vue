@@ -134,7 +134,14 @@
         v-if="showTaskBoard"
         class="task-board-sidebar"
       >
+        <!-- 心跳监控小组件 -->
+        <HeartbeatWidget />
+        <!-- 任务看板 -->
         <TaskBoard />
+        <!-- Todo 列表（常驻左侧） -->
+        <div class="sidebar-todo-wrapper">
+          <TodoList :todos="todos" />
+        </div>
       </aside>
 
       <!-- 聊天区域 -->
@@ -181,14 +188,6 @@
 
     <!-- 输入区域 -->
     <footer class="input-area">
-      <!-- Todo List 显示 -->
-      <div
-        v-if="todos.length > 0"
-        class="todo-list-wrapper"
-      >
-        <TodoList :todos="todos" />
-      </div>
-
       <!-- Subtask Progress 显示 -->
       <SubtaskProgress
         v-if="currentSubtask"
@@ -413,6 +412,7 @@ import TaskBoard from '@/modules/tasks/TaskBoard.vue'
 import SystemSidebar from '@/modules/system/SystemSidebar.vue'
 import ExperiencePanel from '@/modules/experience/ExperiencePanel.vue'
 import TimelinePanel from './TimelinePanel.vue'
+import HeartbeatWidget from '@/modules/heartbeat/HeartbeatWidget.vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/store/chat'
 import { useToolsStore } from '@/store/tools'
@@ -486,7 +486,7 @@ const handleSetupPassword = async () => {
   }
 }
 
-type PanelType = 'sessions' | 'tools' | 'memory' | 'skills' | 'cron' | 'tasks' | 'settings' | null
+type PanelType = 'sessions' | 'tools' | 'memory' | 'skills' | 'cron' | 'tasks' | 'settings' | 'heartbeat' | null
 
 // Initialize chat composable with reactive session ID
 const messages = ref<any[]>([])
@@ -825,7 +825,10 @@ function connectWebSocket(sessionId: string) {
           setTimeout(() => sendQueuedMessage(nextMsg), 100)
         }
       } else if (message.type === 'todo.updated') {
-        // Todo 列表更新
+        // Todo 列表更新（仅处理当前 session 的更新）
+        if (message.session_id && message.session_id !== chatStore.currentSessionId) {
+          return
+        }
         if (message.todos && Array.isArray(message.todos)) {
           todos.value = message.todos.map((t: any) => ({
             id: t.id || `todo-${Date.now()}-${Math.random()}`,
@@ -1126,6 +1129,7 @@ const headerActions = computed(() => [
   { id: 'experience', icon: GraduationIcon, label: 'nav.experience', tooltip: 'nav.experienceTooltip', onClick: () => showPanel('experience') },
   // tasks 已移至左侧常驻显示
   { id: 'cron', icon: ClockIcon, label: 'nav.cron', tooltip: 'nav.cronTooltip', onClick: () => showPanel('cron') },
+  // heartbeat 已移至左侧常驻显示
   { id: 'timeline', icon: ListIcon, label: 'nav.timeline', tooltip: 'nav.timelineTooltip', onClick: () => toggleTimeline() },
   { id: 'knowledge_search', icon: KnowledgeSearchIcon, label: 'nav.knowledgeSearch', tooltip: 'nav.knowledgeSearchTooltip', onClick: () => showPanel('knowledge_search') },
   { id: 'settings', icon: SettingsIcon, label: 'settings.title', tooltip: 'nav.settingsTooltip', onClick: () => showPanel('settings') }
@@ -2210,8 +2214,18 @@ onBeforeUnmount(() => {
   max-width: 280px;
   border-right: 1px solid var(--border-color);
   background: var(--bg-primary);
-  overflow-y: auto;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 左侧 Todo 列表 wrapper - 固定在 sidebar 底部 */
+.sidebar-todo-wrapper {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+  min-height: 0; /* 允许 flex 收缩 */
 }
 
 /* 聊天内容区域 */
@@ -2244,12 +2258,6 @@ onBeforeUnmount(() => {
   margin: 0 auto;
   width: 100%;
   padding: var(--spacing-xl);
-}
-
-/* Todo List wrapper in footer */
-.todo-list-wrapper {
-  max-width: 820px;
-  margin: 0 auto 8px;
 }
 
 /* 输入区域 */

@@ -541,8 +541,9 @@ watch(() => chatStore.currentSessionId, () => {
 .task-board {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .task-header {
