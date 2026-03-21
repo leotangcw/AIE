@@ -254,7 +254,8 @@ class TodoToolkit:
                 )
                 created_tasks.append(task)
 
-            # 加载所有任务用于广播
+            # 加载所有任务用于广播 - 清除缓存确保拿到最新数据
+            task_board.db.expire_all()  # 同步方法
             all_tasks = await task_board.get_child_tasks(parent_task.id)
 
             # 广播更新
@@ -296,7 +297,8 @@ class TodoToolkit:
             task_board = await self._get_task_board(db)
             await task_board.complete_task(target_task.id)
 
-            # 重新加载任务
+            # 重新加载任务 - 清除缓存确保拿到最新数据
+            task_board.db.expire_all()  # 同步方法
             parent = await self._get_todo_list_parent()
             all_tasks = await task_board.get_child_tasks(parent.id) if parent else []
 
@@ -365,10 +367,12 @@ class TodoToolkit:
                     old_task = task_map[num]
                     new_num = num + len(tasks)
                     old_task.title = f"{new_num}. {old_task.title.split('. ', 1)[1]}"
-                    # 更新数据库
-                    await task_board.db.commit()
 
-            # 重新加载所有任务
+            # 统一提交所有更改
+            await task_board.db.commit()
+
+            # 重新加载所有任务 - 清除缓存确保拿到最新数据
+            task_board.db.expire_all()  # 同步方法
             all_tasks = await task_board.get_child_tasks(parent.id)
             all_tasks.sort(key=lambda t: int(t.title.split(".")[0]) if "." in t.title else 0)
 
@@ -406,20 +410,23 @@ class TodoToolkit:
 
             # 删除任务
             task_id = target_task.id
+            parent_id = target_task.parent_id
             await task_board.db.delete(target_task)
             await task_board.db.commit()
 
-            # 重新加载剩余任务并重新编号
-            parent = await self._get_todo_list_parent()
-            if parent:
-                remaining = await task_board.get_child_tasks(parent.id)
+            # 重新加载剩余任务并重新编号 - 使用 fresh query 确保拿到最新数据
+            task_board.db.expire_all()  # 清除缓存（同步方法）
+
+            if parent_id:
+                remaining = await task_board.get_child_tasks(parent_id)
 
                 # 按编号排序
                 remaining.sort(key=lambda t: int(t.title.split(".")[0]) if "." in t.title and t.title[0].isdigit() else 0)
 
-                # 重新编号
+                # 重新编号 - 只处理有编号的任务
                 for i, task in enumerate(remaining, 1):
-                    if task.title.split(". ")[0].isdigit():
+                    num_str = task.title.split(". ")[0] if ". " in task.title else ""
+                    if num_str.isdigit():
                         old_desc = task.title.split(". ", 1)[1] if ". " in task.title else task.title
                         task.title = f"{i}. {old_desc}"
 

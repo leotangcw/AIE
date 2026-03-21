@@ -201,6 +201,22 @@ class ErrorMessage(ServerMessage):
     code: str | None = Field(None, description="错误代码")
 
 
+class HeartbeatEventMessage(ServerMessage):
+    """心跳事件消息"""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: str = Field(default="heartbeat_event", description="消息类型")
+    task_id: str = Field(..., description="任务 ID")
+    task_name: str = Field(..., description="任务名称")
+    status: str = Field(..., description="状态")
+    preview: str | None = Field(None, description="预览")
+    duration_ms: float | None = Field(None, description="耗时")
+    ts: int = Field(..., description="时间戳")
+    reason: str | None = Field(None, description="原因")
+    indicator_type: str | None = Field(None, description="指示器类型")
+
+
 class InterruptAckMessage(ServerMessage):
     """中断确认消息"""
 
