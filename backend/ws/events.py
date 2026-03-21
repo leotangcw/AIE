@@ -17,16 +17,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.modules.agent.loop import AgentLoop
+from backend.modules.config.loader import config_loader
 from backend.modules.session.manager import SessionManager
+from backend.modules.session.runtime_config import get_session_model_override
 from backend.ws.connection import (
     ClientMessage,
+    InterruptAckMessage,
+    MessageCompleteIdless,
+    ProcessingStartedMessage,
+    cancel_session,
+    cleanup_cancel_token,
     connection_manager,
+    get_cancel_token,
     send_error,
     send_message_chunk,
     send_message_complete,
     send_tool_call,
     send_tool_result,
 )
+from backend.ws.streaming import BufferedStreamingHandler
 
 
 def _friendly_processing_error(raw: str) -> str:
@@ -87,6 +96,9 @@ async def handle_message_event(
 
         logger.info(f"会话验证通过: {session_id}")
 
+        # 加载会话级模型覆盖配置
+        model_override = get_session_model_override(session, config_loader.config)
+
         # 保存用户消息到数据库
         user_message = await session_manager.add_message(
             session_id=session_id,
@@ -141,6 +153,7 @@ async def handle_message_event(
             session_id=session_id,
             context=context,
             cancel_token=cancel_token,
+            model_override=model_override,
         ):
             # 检查是否被取消
             if cancel_token.is_cancelled:
@@ -289,6 +302,181 @@ async def handle_unsubscribe_event(
     logger.info(f"连接 {connection_id} 取消订阅会话 {session_id}")
 
 
+async def _send_interrupt_ack(
+    connection_id: str,
+    session_id: str,
+    supplement_context: str,
+) -> None:
+    """发送中断确认消息"""
+    await connection_manager.send_message(
+        connection_id,
+        InterruptAckMessage(
+            sessionId=session_id,
+            supplementContext=supplement_context,
+        ),
+    )
+
+
+async def _send_processing_started(connection_id: str, session_id: str) -> None:
+    """发送开始处理消息"""
+    await connection_manager.send_message(
+        connection_id,
+        ProcessingStartedMessage(sessionId=session_id),
+    )
+
+
+async def _send_message_complete(connection_id: str, session_id: str) -> None:
+    """发送消息完成通知"""
+    await connection_manager.send_message(
+        connection_id,
+        MessageCompleteIdless(sessionId=session_id),
+    )
+
+
+async def _prepare_interrupt_messages(
+    session_manager: SessionManager,
+    session_id: str,
+    full_content: str,
+) -> tuple[str | None, list[dict[str, str]]]:
+    """准备消息：保存用户消息并获取历史上下文（并行执行）"""
+    import asyncio
+
+    # 并行执行：保存用户消息 + 获取历史
+    save_task = session_manager.add_message(
+        session_id=session_id,
+        role="user",
+        content=full_content,
+    )
+    history_task = session_manager.get_messages(session_id=session_id, limit=50)
+
+    user_message, messages = await asyncio.gather(save_task, history_task)
+
+    if user_message:
+        logger.info(f"[Interrupt] User message saved: {user_message.id}")
+
+    # 构建上下文
+    context = [
+        {"role": msg.role, "content": msg.content}
+        for msg in messages[:-1]
+    ]
+
+    return user_message.id if user_message else None, context
+
+
+async def _process_interrupt_streaming(
+    agent_loop: AgentLoop,
+    full_content: str,
+    session_id: str,
+    context: list[dict[str, str]],
+    cancel_token,
+) -> str:
+    """处理消息流式输出"""
+    assistant_content = ""
+    streaming_handler = BufferedStreamingHandler(
+        session_id=session_id,
+        buffer_size=10,
+        flush_interval_ms=10,
+    )
+
+    async for chunk in agent_loop.process_message(
+        message=full_content,
+        session_id=session_id,
+        context=context,
+        cancel_token=cancel_token,
+    ):
+        if cancel_token.is_cancelled:
+            logger.info(f"[Interrupt] Processing cancelled: {session_id}")
+            await streaming_handler.write("\n\n[已停止生成]")
+            await streaming_handler.flush()
+            break
+
+        assistant_content += chunk
+        await streaming_handler.write(chunk)
+
+    await streaming_handler.flush()
+    return assistant_content
+
+
+async def handle_interrupt_event(
+    connection_id: str,
+    session_id: str,
+    content: str,
+    chat_id: str | None,
+    agent_loop: AgentLoop,
+    db: AsyncSession,
+) -> None:
+    """处理中断事件 (补充模式)
+
+    当用户在任务执行时发送新消息，实现类似 JiuWenClaw 的 supplement 机制：
+    1. 取消当前正在执行的任务
+    2. 获取当前待办事项上下文
+    3. 将新消息与待办上下文一起放入队列
+
+    Args:
+        connection_id: 连接 ID
+        session_id: 会话 ID
+        content: 用户新消息内容
+        chat_id: 聊天 ID
+        agent_loop: Agent 循环实例
+        db: 数据库会话
+    """
+    logger.info(f"[Interrupt] Session {session_id} interrupted with message: {content[:50]}...")
+
+    try:
+        # 1. 取消当前正在执行的任务
+        cancel_session(session_id)
+
+        # 2. 获取待办事项上下文（使用集中统一的实现）
+        from backend.modules.agent.todo_toolkit import get_interrupt_supplement
+        supplement_context = await get_interrupt_supplement(session_id)
+
+        # 3. 构建完整消息
+        full_content = content
+        if supplement_context:
+            full_content = f"{content}{supplement_context}"
+
+        # 4. 发送中断确认
+        await _send_interrupt_ack(connection_id, session_id, supplement_context)
+
+        # 5. 准备消息（并行保存用户消息和获取历史上下文）
+        session_manager = SessionManager(db)
+        _, context = await _prepare_interrupt_messages(
+            session_manager, session_id, full_content
+        )
+
+        # 6. 通知前端开始处理
+        await _send_processing_started(connection_id, session_id)
+
+        # 7. 处理消息流式输出
+        cleanup_cancel_token(session_id)
+        cancel_token = get_cancel_token(session_id)
+
+        assistant_content = await _process_interrupt_streaming(
+            agent_loop, full_content, session_id, context, cancel_token
+        )
+
+        # 8. 保存助手响应
+        if assistant_content:
+            await session_manager.add_message(
+                session_id=session_id,
+                role="assistant",
+                content=assistant_content,
+            )
+
+        # 9. 发送完成通知
+        await _send_message_complete(connection_id, session_id)
+
+        logger.info(f"[Interrupt] Message processed for session {session_id}")
+
+    except Exception as e:
+        logger.exception(f"[Interrupt] Failed to process interrupt: {e}")
+        await send_error(
+            session_id,
+            f"处理中断消息失败: {str(e)}",
+            "INTERRUPT_ERROR",
+        )
+
+
 # ============================================================================
 # Event Router
 # ============================================================================
@@ -353,6 +541,30 @@ async def route_event(
                 return
 
             await handle_unsubscribe_event(connection_id, session_id)
+
+        elif event_type == "interrupt":
+            # 处理中断事件 (补充模式)
+            session_id = event_data.get("sessionId")
+            content = event_data.get("content", "")
+            chat_id = event_data.get("chatId")
+
+            if not session_id:
+                logger.warning("中断事件缺少 sessionId")
+                await send_error(
+                    "",
+                    "Missing sessionId in interrupt event",
+                    "INVALID_EVENT",
+                )
+                return
+
+            await handle_interrupt_event(
+                connection_id=connection_id,
+                session_id=session_id,
+                content=content,
+                chat_id=chat_id,
+                agent_loop=agent_loop,
+                db=db,
+            )
 
         else:
             logger.warning(f"未知事件类型: {event_type}")

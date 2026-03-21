@@ -17,42 +17,118 @@ from fastapi import WebSocket, WebSocketDisconnect, status
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-# 全局取消令牌管理器
 from backend.modules.agent.task_manager import CancellationToken
 
-_session_cancel_tokens: dict[str, CancellationToken] = {}
+
+class CancelTokenManager:
+    """取消令牌管理器 - 封装会话取消令牌的全局状态
+
+    提供线程安全的会话取消令牌管理，支持：
+    - 获取或创建会话的取消令牌
+    - 取消会话处理
+    - 清理会话令牌
+    """
+
+    def __init__(self):
+        self._tokens: dict[str, CancellationToken] = {}
+        self._lock = asyncio.Lock()
+
+    async def get_cancel_token(self, session_id: str) -> CancellationToken:
+        """获取或创建会话的取消令牌"""
+        async with self._lock:
+            # 如果已存在且已取消，先清理
+            if session_id in self._tokens:
+                old_token = self._tokens[session_id]
+                if old_token.is_cancelled:
+                    logger.debug(f"Cleaning up cancelled token for session {session_id}")
+                    del self._tokens[session_id]
+
+            # 创建新的取消令牌
+            if session_id not in self._tokens:
+                self._tokens[session_id] = CancellationToken()
+                logger.debug(f"Created new cancel token for session {session_id}")
+
+            return self._tokens[session_id]
+
+    async def cancel_session(self, session_id: str) -> bool:
+        """取消会话的处理"""
+        async with self._lock:
+            if session_id in self._tokens:
+                self._tokens[session_id].cancel()
+                logger.info(f"Cancelled session: {session_id}")
+                return True
+            return False
+
+    async def cleanup(self, session_id: str):
+        """清理会话的取消令牌"""
+        async with self._lock:
+            if session_id in self._tokens:
+                del self._tokens[session_id]
+
+    def get_cancel_token_sync(self, session_id: str) -> CancellationToken:
+        """同步获取取消令牌（用于不支持 async 的场景）"""
+        # 如果已存在且已取消，先清理
+        if session_id in self._tokens:
+            old_token = self._tokens[session_id]
+            if old_token.is_cancelled:
+                logger.debug(f"Cleaning up cancelled token for session {session_id}")
+                del self._tokens[session_id]
+
+        # 创建新的取消令牌
+        if session_id not in self._tokens:
+            self._tokens[session_id] = CancellationToken()
+            logger.debug(f"Created new cancel token for session {session_id}")
+
+        return self._tokens[session_id]
+
+    def cancel_session_sync(self, session_id: str) -> bool:
+        """同步取消会话"""
+        if session_id in self._tokens:
+            self._tokens[session_id].cancel()
+            logger.info(f"Cancelled session: {session_id}")
+            return True
+        return False
+
+    def cleanup_sync(self, session_id: str):
+        """同步清理会话令牌"""
+        if session_id in self._tokens:
+            del self._tokens[session_id]
 
 
+# 全局单例
+_cancel_token_manager = CancelTokenManager()
+
+
+# 向后兼容的函数接口（同步版本，用于 WS 连接管理等场景）
 def get_cancel_token(session_id: str) -> CancellationToken:
     """获取或创建会话的取消令牌"""
-    # 如果已存在且已取消，先清理
-    if session_id in _session_cancel_tokens:
-        old_token = _session_cancel_tokens[session_id]
-        if old_token.is_cancelled:
-            logger.debug(f"Cleaning up cancelled token for session {session_id}")
-            del _session_cancel_tokens[session_id]
-    
-    # 创建新的取消令牌
-    if session_id not in _session_cancel_tokens:
-        _session_cancel_tokens[session_id] = CancellationToken()
-        logger.debug(f"Created new cancel token for session {session_id}")
-    
-    return _session_cancel_tokens[session_id]
+    return _cancel_token_manager.get_cancel_token_sync(session_id)
 
 
 def cancel_session(session_id: str) -> bool:
     """取消会话的处理"""
-    if session_id in _session_cancel_tokens:
-        _session_cancel_tokens[session_id].cancel()
-        logger.info(f"Cancelled session: {session_id}")
-        return True
-    return False
+    return _cancel_token_manager.cancel_session_sync(session_id)
 
 
 def cleanup_cancel_token(session_id: str):
     """清理会话的取消令牌"""
-    if session_id in _session_cancel_tokens:
-        del _session_cancel_tokens[session_id]
+    _cancel_token_manager.cleanup_sync(session_id)
+
+
+# 异步版本（供新代码使用）
+async def get_cancel_token_async(session_id: str) -> CancellationToken:
+    """异步获取或创建会话的取消令牌"""
+    return await _cancel_token_manager.get_cancel_token(session_id)
+
+
+async def cancel_session_async(session_id: str) -> bool:
+    """异步取消会话的处理"""
+    return await _cancel_token_manager.cancel_session(session_id)
+
+
+async def cleanup_cancel_token_async(session_id: str):
+    """异步清理会话的取消令牌"""
+    await _cancel_token_manager.cleanup(session_id)
 
 
 # ============================================================================
@@ -123,6 +199,34 @@ class ErrorMessage(ServerMessage):
     type: str = Field(default="error", description="消息类型")
     message: str = Field(..., description="错误描述")
     code: str | None = Field(None, description="错误代码")
+
+
+class InterruptAckMessage(ServerMessage):
+    """中断确认消息"""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: str = Field(default="interrupt_ack", description="消息类型")
+    sessionId: str = Field(..., description="会话 ID")
+    supplementContext: str = Field("", description="补充上下文（待办事项）")
+
+
+class ProcessingStartedMessage(ServerMessage):
+    """开始处理消息"""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: str = Field(default="processing_started", description="消息类型")
+    sessionId: str = Field(..., description="会话 ID")
+
+
+class MessageCompleteIdless(ServerMessage):
+    """消息完成通知（无需 messageId）"""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: str = Field(default="message_complete", description="消息类型")
+    sessionId: str = Field(..., description="会话 ID")
 
 
 # ============================================================================

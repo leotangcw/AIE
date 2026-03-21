@@ -20,6 +20,9 @@ _CHANNEL_REGISTRY: dict[str, tuple[str, str]] = {
     "wechat": ("backend.modules.channels.wechat", "WeChatChannel"),
     "dingtalk": ("backend.modules.channels.dingtalk", "DingTalkChannel"),
     "feishu": ("backend.modules.channels.feishu", "FeishuChannel"),
+    "wecom": ("backend.modules.channels.wecom", "WeComChannel"),
+    "weibo": ("backend.modules.channels.weibo", "WeiboChannel"),
+    "xiaozhi": ("backend.modules.channels.xiaozhi", "XiaozhiChannel"),
 }
 
 

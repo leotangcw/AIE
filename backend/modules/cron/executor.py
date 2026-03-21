@@ -1,5 +1,6 @@
 """Cron 任务执行器"""
 
+from enum import Enum
 from typing import Optional
 
 from backend.modules.agent.loop import AgentLoop
@@ -8,8 +9,16 @@ from backend.modules.session.manager import SessionManager
 from backend.modules.channels.manager import ChannelManager
 from backend.utils.logger import logger
 
-# Heartbeat 特殊消息标记
-HEARTBEAT_MESSAGE_MARKER = "__heartbeat__"
+
+class CronJobType(str, Enum):
+    """Cron 任务类型枚举"""
+    HEARTBEAT = "__heartbeat__"
+    TASK_HEARTBEAT = "__task_heartbeat__"
+
+
+# 向后兼容常量
+HEARTBEAT_MESSAGE_MARKER = CronJobType.HEARTBEAT.value
+TASK_HEARTBEAT_MESSAGE_MARKER = CronJobType.TASK_HEARTBEAT.value
 
 
 
@@ -44,6 +53,10 @@ class CronExecutor:
         # 识别 heartbeat 特殊任务
         if message == HEARTBEAT_MESSAGE_MARKER:
             return await self._execute_heartbeat(job_id, channel, chat_id, deliver_response)
+
+        # 识别 task heartbeat 特殊任务
+        if message == TASK_HEARTBEAT_MESSAGE_MARKER:
+            return await self._execute_task_heartbeat(job_id)
 
         try:
             # 如果有 channel 和 chat_id，查找或创建对应的会话
@@ -122,6 +135,39 @@ class CronExecutor:
         except Exception as e:
             logger.error(f"Heartbeat execution failed: {e}")
             return ""
+
+    async def _execute_task_heartbeat(self, job_id: str) -> str:
+        """执行 task heartbeat 任务 - 检测长时间运行的任务超时"""
+        try:
+            from backend.modules.agent.task_board import run_task_heartbeat
+
+            result = await run_task_heartbeat()
+
+            warnings = result.get("scan_result", {}).get("warnings", [])
+            timeouts = result.get("scan_result", {}).get("timeouts", [])
+            long_waiting = result.get("long_waiting", [])
+
+            if warnings:
+                logger.info(f"[TaskHeartbeat] {len(warnings)} tasks running slow")
+            if timeouts:
+                logger.warning(f"[TaskHeartbeat] {len(timeouts)} tasks timed out")
+            if long_waiting:
+                logger.info(f"[TaskHeartbeat] {len(long_waiting)} tasks long waiting")
+
+            # 返回简要结果
+            summary_parts = []
+            if warnings:
+                summary_parts.append(f"{len(warnings)} warnings")
+            if timeouts:
+                summary_parts.append(f"{len(timeouts)} timeouts")
+            if long_waiting:
+                summary_parts.append(f"{len(long_waiting)} long waiting")
+
+            return f"Task heartbeat: {', '.join(summary_parts)}" if summary_parts else "Task heartbeat: OK"
+
+        except Exception as e:
+            logger.error(f"Task heartbeat execution failed: {e}")
+            return f"Task heartbeat error: {e}"
 
     async def _deliver_to_channel(
         self,

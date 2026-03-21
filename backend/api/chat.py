@@ -21,6 +21,7 @@ from backend.modules.agent.skills import SkillsLoader
 from backend.modules.config.loader import config_loader
 from backend.modules.providers.litellm_provider import LiteLLMProvider
 from backend.modules.session.manager import SessionManager
+from backend.modules.session.runtime_config import get_session_model_override
 from backend.modules.tools.registry import ToolRegistry
 from backend.utils.paths import WORKSPACE_DIR
 
@@ -375,7 +376,10 @@ async def send_message(
         
         # 获取会话总结
         session_summary = session.summary
-        
+
+        # 加载会话级模型覆盖配置
+        model_override = get_session_model_override(session, config_loader.config)
+
         # 保存用户消息到数据库
         session_manager = SessionManager(db)
         user_message = await session_manager.add_message(
@@ -460,6 +464,7 @@ async def send_message(
                     session_id=request.session_id,
                     context=context,
                     media=request.attachments,
+                    model_override=model_override,
                 ):
                     assistant_content += chunk
                     
