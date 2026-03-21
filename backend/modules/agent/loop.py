@@ -568,6 +568,8 @@ class AgentLoop:
                 elif tool_name == "todo_remove":
                     idx = arguments.get("idx")
                     result = await toolkit.todo_remove(idx)
+                elif tool_name == "todo_clear":
+                    result = await toolkit.todo_clear()
                 elif tool_name == "todo_list":
                     result = await toolkit.todo_list()
                 else:

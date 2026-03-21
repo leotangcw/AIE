@@ -78,6 +78,7 @@ class TodoToolkit:
         "todo_complete",
         "todo_insert",
         "todo_remove",
+        "todo_clear",
         "todo_list",
     ])
 
@@ -440,6 +441,40 @@ class TodoToolkit:
 
             return f"已删除任务 {idx}"
 
+    async def todo_clear(self) -> str:
+        """清空所有待办任务（批量删除）
+
+        Returns:
+            str: 操作结果
+        """
+        db = await self._get_db()
+        async with db:
+            task_board = await self._get_task_board(db)
+
+            # 获取父任务
+            parent = await self._get_todo_list_parent()
+            if not parent:
+                return "待办列表为空"
+
+            # 获取所有子任务
+            tasks = await task_board.get_child_tasks(parent.id)
+            if not tasks:
+                return "待办列表为空"
+
+            # 一次性删除所有子任务
+            for task in tasks:
+                await task_board.db.delete(task)
+
+            # 删除父任务（todo list 本身）
+            await task_board.db.delete(parent)
+
+            await task_board.db.commit()
+
+            # 广播更新（空列表）
+            await self._emit_todo_updated([])
+
+            return f"已清空所有待办任务（共删除 {len(tasks)} 个）"
+
     async def todo_list(self) -> str:
         """列出所有待办任务
 
@@ -541,6 +576,14 @@ class TodoToolkit:
                         },
                     },
                     "required": ["idx"],
+                },
+            },
+            {
+                "name": "todo_clear",
+                "description": "清空所有待办任务。当需要删除所有任务时使用此工具，比逐个删除更高效。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
                 },
             },
             {
