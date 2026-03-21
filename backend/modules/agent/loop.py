@@ -4,10 +4,11 @@ import asyncio
 import json
 import time
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Optional
 
 from loguru import logger
 from backend.modules.tools.conversation_history import get_conversation_history
+from backend.modules.agent.todo_toolkit import TodoToolkit, TodoStatus, format_todo_summary
 
 
 class AgentLoop:
@@ -40,12 +41,116 @@ class AgentLoop:
         self.retry_delay = retry_delay
         self.temperature = temperature
         self.max_tokens = max_tokens
-        
+
         logger.debug(
             f"AgentLoop initialized: workspace={workspace}, "
             f"max_iterations={max_iterations}, max_retries={max_retries}, "
             f"temperature={temperature}, max_tokens={max_tokens}"
         )
+
+    def _resolve_execution_runtime(
+        self,
+        model_override: Optional[dict[str, Any]] = None,
+    ) -> tuple[Any, Optional[str], float, int, int]:
+        """解析当前消息执行应使用的 provider 和模型参数。
+
+        支持会话级模型覆盖：当 model_override 指定了不同的 api_key 或 api_base 时，
+        会创建一个新的 LiteLLMProvider 实例。
+
+        Args:
+            model_override: 可选的模型覆盖参数，来自 SessionRuntimeConfig
+
+        Returns:
+            tuple: (provider, model, temperature, max_tokens, max_iterations)
+        """
+        base_provider = self.provider
+        base_model = self.model
+        base_temperature = self.temperature
+        base_max_tokens = self.max_tokens
+        base_max_iterations = self.max_iterations
+
+        if not model_override:
+            return (
+                base_provider,
+                base_model,
+                base_temperature,
+                base_max_tokens,
+                base_max_iterations,
+            )
+
+        # 使用覆盖参数
+        candidate_provider = base_provider
+        candidate_model = model_override.get("model", base_model)
+        candidate_temperature = model_override.get("temperature", base_temperature)
+        candidate_max_tokens = model_override.get("max_tokens", base_max_tokens)
+        candidate_max_iterations = model_override.get(
+            "max_iterations", base_max_iterations
+        )
+
+        # 检查是否需要创建新的 provider（api_key 或 api_base 不同）
+        override_provider = model_override.get("provider")
+        override_api_key = model_override.get("api_key") or None
+        override_api_base = model_override.get("api_base") or None
+
+        # 当前 provider 的配置
+        current_api_key = getattr(base_provider, "api_key", None) or ""
+        current_api_base = getattr(base_provider, "api_base", None) or ""
+
+        # 如果 api_key 或 api_base 不同，需要创建新的 provider
+        if override_api_key and override_api_key != current_api_key:
+            needs_new_provider = True
+        elif override_api_base and override_api_base != current_api_base:
+            needs_new_provider = True
+        else:
+            needs_new_provider = False
+
+        if needs_new_provider:
+            try:
+                from backend.modules.providers.litellm_provider import LiteLLMProvider
+
+                candidate_provider = LiteLLMProvider(
+                    api_key=override_api_key,
+                    api_base=override_api_base,
+                    default_model=candidate_model,
+                    timeout=getattr(base_provider, "timeout", 120.0),
+                    max_retries=getattr(base_provider, "max_retries", self.max_retries),
+                    provider_id=override_provider,
+                )
+                logger.info(
+                    f"Created new LiteLLMProvider for session override: "
+                    f"provider={override_provider}, model={candidate_model}"
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"Failed to create runtime provider override, falling back to base runtime config: {exc}"
+                )
+                return (
+                    base_provider,
+                    base_model,
+                    base_temperature,
+                    base_max_tokens,
+                    base_max_iterations,
+                )
+
+        return (
+            candidate_provider,
+            candidate_model,
+            candidate_temperature,
+            candidate_max_tokens,
+            candidate_max_iterations,
+        )
+
+    async def _get_interrupt_supplement(self, session_id: str) -> str:
+        """获取中断补充消息，包含当前待办事项上下文
+
+        Args:
+            session_id: 会话 ID
+
+        Returns:
+            str: 格式化后的中断补充消息
+        """
+        from backend.modules.agent.todo_toolkit import get_interrupt_supplement as _get_interrupt_supplement
+        return await _get_interrupt_supplement(session_id)
 
     async def process_message(
         self,
@@ -57,25 +162,32 @@ class AgentLoop:
         chat_id: str | None = None,
         cancel_token=None,
         yield_intermediate: bool = True,
+        model_override: dict[str, Any] | None = None,
     ) -> AsyncIterator[str]:
         """处理用户消息并生成流式响应
-        
+
         Args:
             yield_intermediate: 是否输出中间迭代内容
                                True: Web UI 流式模式，实时输出
                                False: 频道模式，仅输出最终回复
+            model_override: 可选的会话级模型覆盖参数，来自 SessionRuntimeConfig
         """
         logger.info(f"Processing message for session {session_id}: {message[:50]}...")
-        
+
+        # 解析执行时配置（支持会话级模型覆盖）
+        runtime_provider, runtime_model, runtime_temperature, runtime_max_tokens, runtime_max_iterations = (
+            self._resolve_execution_runtime(model_override)
+        )
+
         # 设置工具注册表的会话ID（用于审计日志）和渠道信息
         if self.tools:
             self.tools.set_session_id(session_id)
             self.tools.set_channel(channel)
-            
+
             spawn_tool = self.tools.get_tool("spawn")
-            if spawn_tool and hasattr(spawn_tool, 'set_context'):
+            if spawn_tool and hasattr(spawn_tool, "set_context"):
                 spawn_tool.set_context(session_id)
-        
+
         if self.context_builder and context is not None:
             messages = self.context_builder.build_messages(
                 history=context,
@@ -87,41 +199,49 @@ class AgentLoop:
         else:
             if context is None:
                 context = []
-            
+
             messages = list(context)
-            messages.append({
-                "role": "user",
-                "content": message,
-            })
-        
+            messages.append({"role": "user", "content": message})
+
         iteration = 0
         total_tool_calls = 0
         final_content = ""
 
         try:
-            while iteration < self.max_iterations:
+            while iteration < runtime_max_iterations:
                 iteration += 1
-                
+
                 # 检查是否被取消
                 if cancel_token and cancel_token.is_cancelled:
                     logger.info(f"Agent loop cancelled at iteration {iteration}: {session_id}")
+                    # 获取中断补充消息
+                    supplement = await self._get_interrupt_supplement(session_id)
+                    if supplement:
+                        yield f"\n\n[任务被中断]{supplement}"
                     return
-                
-                logger.debug(f"Agent iteration {iteration}/{self.max_iterations}, total tool calls: {total_tool_calls}")
-                
+
+                logger.debug(
+                    f"Agent iteration {iteration}/{runtime_max_iterations}, total tool calls: {total_tool_calls}"
+                )
+
+                # 获取基础工具定义
                 tool_definitions = self.tools.get_definitions() if self.tools else []
-                
+
+                # 合并 Todo 工具定义 (TodoToolkit 是 session 级别的)
+                todo_tool_defs = TodoToolkit.get_tool_definitions()
+                tool_definitions = tool_definitions + todo_tool_defs
+
                 content_buffer = ""
                 tool_calls_buffer = []
                 finish_reason = None
                 reasoning_buffer = ""
-                
-                async for chunk in self.provider.chat_stream(
+
+                async for chunk in runtime_provider.chat_stream(
                     messages=messages,
                     tools=tool_definitions,
-                    model=self.model,
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens,
+                    model=runtime_model,
+                    temperature=runtime_temperature,
+                    max_tokens=runtime_max_tokens,
                 ):
                     if chunk.is_content and chunk.content:
                         content_buffer += chunk.content
@@ -179,16 +299,20 @@ class AgentLoop:
                         messages.append(msg)
                     
                     for tool_call in tool_calls_buffer:
-                        if total_tool_calls >= self.max_iterations:
+                        if total_tool_calls >= runtime_max_iterations:
                             logger.warning(
-                                f"Reached max tool calls limit ({self.max_iterations}), "
+                                f"Reached max tool calls limit ({runtime_max_iterations}), "
                                 f"skipping remaining tool calls in this iteration"
                             )
                             break
-                        
+
                         # 检查是否被取消
                         if cancel_token and cancel_token.is_cancelled:
                             logger.info(f"Agent loop cancelled before tool execution: {session_id}")
+                            # 获取中断补充消息
+                            supplement = await self._get_interrupt_supplement(session_id)
+                            if supplement:
+                                yield f"\n\n[任务被中断]{supplement}"
                             return
 
                         total_tool_calls += 1
@@ -197,7 +321,7 @@ class AgentLoop:
                         tool_id = tool_call.id
 
                         logger.info(
-                            f"Executing tool {total_tool_calls}/{self.max_iterations}: "
+                            f"Executing tool {total_tool_calls}/{runtime_max_iterations}: "
                             f"{tool_name} with args: {json.dumps(tool_args, ensure_ascii=False)}"
                         )
                         
@@ -221,8 +345,11 @@ class AgentLoop:
                         
                         for attempt in range(self.max_retries):
                             try:
-                                # 执行工具
-                                result = await self.execute_tool(tool_name, tool_args)
+                                # 执行工具 (检查是否是 todo 工具)
+                                if tool_name in TodoToolkit.TOOL_NAMES:
+                                    result = await self._execute_todo_tool(tool_name, tool_args, session_id)
+                                else:
+                                    result = await self.execute_tool(tool_name, tool_args)
                                 logger.debug(f"Tool {tool_name} executed successfully")
                                 break
                                 
@@ -335,13 +462,13 @@ class AgentLoop:
                     break
             
             # 检查是否达到限制
-            if iteration >= self.max_iterations or total_tool_calls >= self.max_iterations:
-                if total_tool_calls >= self.max_iterations:
-                    logger.warning(f"Max tool calls ({self.max_iterations}) reached")
-                    warning_msg = f"\n\n[达到最大工具调用次数 {self.max_iterations}]"
+            if iteration >= runtime_max_iterations or total_tool_calls >= runtime_max_iterations:
+                if total_tool_calls >= runtime_max_iterations:
+                    logger.warning(f"Max tool calls ({runtime_max_iterations}) reached")
+                    warning_msg = f"\n\n[达到最大工具调用次数 {runtime_max_iterations}]"
                 else:
-                    logger.warning(f"Max iterations ({self.max_iterations}) reached")
-                    warning_msg = f"\n\n[达到最大迭代次数 {self.max_iterations}]"
+                    logger.warning(f"Max iterations ({runtime_max_iterations}) reached")
+                    warning_msg = f"\n\n[达到最大迭代次数 {runtime_max_iterations}]"
                 yield warning_msg
                 final_content += warning_msg
             
@@ -402,6 +529,54 @@ class AgentLoop:
             
         except Exception as e:
             logger.error(f"Tool execution failed: {tool_name} - {e}")
+            raise
+
+    async def _execute_todo_tool(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        session_id: str,
+    ) -> str:
+        """执行 Todo 工具调用
+
+        Args:
+            tool_name: 工具名称
+            arguments: 工具参数
+            session_id: 会话 ID
+
+        Returns:
+            str: 工具执行结果
+        """
+        from backend.database import AsyncSessionLocal
+
+        logger.debug(f"Executing todo tool: {tool_name}")
+
+        try:
+            async with AsyncSessionLocal() as db:
+                toolkit = TodoToolkit(session_id=session_id, db=db)
+
+                if tool_name == "todo_create":
+                    tasks = arguments.get("tasks", [])
+                    result = await toolkit.todo_create(tasks)
+                elif tool_name == "todo_complete":
+                    idx = arguments.get("idx")
+                    result = await toolkit.todo_complete(idx, arguments.get("result", "done"))
+                elif tool_name == "todo_insert":
+                    idx = arguments.get("idx", 0)
+                    tasks = arguments.get("tasks", [])
+                    result = await toolkit.todo_insert(idx, tasks)
+                elif tool_name == "todo_remove":
+                    idx = arguments.get("idx")
+                    result = await toolkit.todo_remove(idx)
+                elif tool_name == "todo_list":
+                    result = await toolkit.todo_list()
+                else:
+                    result = f"错误：未知的 todo 工具 {tool_name}"
+
+                return result
+
+        except Exception as e:
+            logger.error(f"Todo tool execution failed: {tool_name} - {e}")
             raise
 
     async def process_direct(

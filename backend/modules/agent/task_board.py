@@ -514,7 +514,7 @@ class TaskBoardService:
             service = TaskBoardService(db)
             return await service.create_system_task(
                 title=title,
-                task_type=TaskStatus.PENDING.value,
+                task_type="cron",  # 系统定时任务类型
                 cron_id=cron_id,
                 cron_expression=cron_expression,
             )
@@ -586,10 +586,15 @@ class TaskHeartbeatService:
 
     async def check_long_waiting_tasks(self) -> list:
         """检测长时间等待（无进展）的任务"""
+        from datetime import timedelta
+
+        # 使用 timedelta 计算阈值时间
+        threshold_time = datetime.utcnow() - timedelta(seconds=self.LONG_WAITING_THRESHOLD)
+
         result = await self.db.execute(
             select(TaskItem)
             .where(TaskItem.status == TaskStatus.RUNNING.value)
-            .where(TaskItem.updated_at < datetime.utcnow())
+            .where(TaskItem.updated_at < threshold_time)
         )
         tasks = result.scalars().all()
 
@@ -656,4 +661,71 @@ async def run_task_heartbeat():
             "long_waiting": long_waiting,
             "archived": archived_count,
         }
+
+
+# =========================================================================
+# Task Heartbeat Cron Job 集成
+# =========================================================================
+
+# Task Heartbeat Job ID
+TASK_HEARTBEAT_JOB_ID = "builtin:task_heartbeat"
+
+# Task Heartbeat 默认 schedule: 每 5 分钟
+TASK_HEARTBEAT_SCHEDULE = "*/5 * * * *"
+
+
+async def ensure_task_heartbeat_job(db_session_factory):
+    """确保内置 task_heartbeat cron job 存在（app 启动时调用）"""
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import select
+    from backend.models.cron_job import CronJob
+
+    # 北京时区
+    SHANGHAI_TZ = timezone(timedelta(hours=8))
+
+    try:
+        async with db_session_factory() as db:
+            result = await db.execute(
+                select(CronJob).where(CronJob.id == TASK_HEARTBEAT_JOB_ID)
+            )
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                # 已存在，确保启用
+                if not existing.enabled:
+                    existing.enabled = True
+                    existing.updated_at = datetime.now(SHANGHAI_TZ).replace(tzinfo=None)
+                    from croniter import croniter
+                    now_sh = datetime.now(SHANGHAI_TZ).replace(tzinfo=None)
+                    existing.next_run = croniter(existing.schedule, now_sh).get_next(datetime)
+                    await db.commit()
+                return
+
+            # 创建新的 job
+            now_sh = datetime.now(SHANGHAI_TZ).replace(tzinfo=None)
+            from croniter import croniter
+            next_run = croniter(TASK_HEARTBEAT_SCHEDULE, now_sh).get_next(datetime)
+
+            job = CronJob(
+                id=TASK_HEARTBEAT_JOB_ID,
+                name="任务心跳检测",
+                schedule=TASK_HEARTBEAT_SCHEDULE,
+                message="__task_heartbeat__",  # 特殊标记，executor 识别
+                enabled=True,
+                deliver_response=False,
+                last_run=None,
+                next_run=next_run,
+                last_status=None,
+                last_error=None,
+                run_count=0,
+                error_count=0,
+                created_at=now_sh,
+                updated_at=now_sh,
+            )
+            db.add(job)
+            await db.commit()
+            logger.info(f"[TaskHeartbeat] Created builtin cron job: {TASK_HEARTBEAT_JOB_ID}")
+
+    except Exception as e:
+        logger.warning(f"[TaskHeartbeat] Failed to ensure task heartbeat job: {e}")
 

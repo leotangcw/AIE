@@ -281,6 +281,13 @@ async def lifespan(app: FastAPI):
     await scheduler.trigger_reschedule()
     logger.info("Heartbeat job ensured")
 
+    # 注册内置任务心跳检测任务
+    logger.info("Ensuring task heartbeat job...")
+    from backend.modules.agent.task_board import ensure_task_heartbeat_job
+    await ensure_task_heartbeat_job(db_session_factory)
+    await scheduler.trigger_reschedule()
+    logger.info("Task heartbeat job ensured")
+
     app.state.cron_scheduler = scheduler
     app.state.cron_executor = cron_executor
 

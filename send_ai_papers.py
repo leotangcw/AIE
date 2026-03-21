@@ -19,134 +19,95 @@ SENDER_PASSWORD = "SWdqGSFtw34fRnie"
 RECEIVER_EMAIL = "tangchengwen@163.com"
 
 # 今日日期
-TODAY = datetime.now().strftime("%Y-%m-%d")
+today = datetime.now().strftime("%Y-%m-%d")
 
-# 论文数据
+# 论文数据（从 arxiv 获取的最新论文）
 papers = [
     {
-        "title": "PhysMoDPO: Physically-Plausible Humanoid Motion with Preference Optimization",
-        "summary": "提出 PhysMoDPO，一种直接偏好优化框架，用于生成符合物理规律的人形机器人运动。通过将全身控制器（WBC）集成到训练流程中，优化扩散模型使输出既符合物理规律又符合文本指令。在仿真机器人和真实 G1 人形机器人上展示了显著改进。",
-        "category": "机器人学习/运动控制",
-        "link": "https://arxiv.org/abs/2603.13228"
+        "title": "MultihopSpatial: Multi-hop Compositional Spatial Reasoning Benchmark for Vision-Language Model",
+        "summary": "针对视觉语言模型（VLMs）的空间推理能力，提出了 MultihopSpatial 基准测试。该基准专注于多跳组合空间推理，包含 1-3 跳复杂查询，并提出了 Acc@50IoU 新评估指标。对 37 个最先进 VLM 的评估揭示了组合空间推理仍是重大挑战。",
+        "category": "计算机视觉 / 视觉语言模型",
+        "authors": "Youngwan Lee et al."
     },
     {
-        "title": "Representation Learning for Spatiotemporal Physical Systems",
-        "summary": "研究时空物理系统的表示学习，发现潜在空间学习方法（如 JEPA）在下游科学任务上优于像素级预测方法。由 Yann LeCun 等作者完成，发表于 ICLR 2026 Workshop。",
-        "category": "表示学习/科学 AI",
-        "link": "https://arxiv.org/abs/2603.13227"
+        "title": "PromptHub: Enhancing Multi-Prompt Visual In-Context Learning with Locality-Aware Fusion",
+        "summary": "提出了 PromptHub 框架，通过位置感知融合、集中和对齐来增强多提示视觉上下文学习。该方法利用空间先验捕获更丰富的上下文信息，在三个基本视觉任务上展示了优越性，并验证了其在分布外设置中的通用性和鲁棒性。",
+        "category": "计算机视觉 / 上下文学习",
+        "authors": "Tianci Luo et al."
     },
     {
-        "title": "Visual-ERM: Reward Modeling for Visual Equivalence",
-        "summary": "提出视觉等价奖励模型（Visual-ERM），为视觉到代码任务提供细粒度、可解释的反馈。在图表转代码任务上提升 Qwen3-VL-8B-Instruct 达 +8.4 分，并引入 VC-RewardBench 基准测试。",
-        "category": "视觉语言模型/强化学习",
-        "link": "https://arxiv.org/abs/2603.13224"
+        "title": "Reasoning over Mathematical Objects: On-Policy Reward Modeling and Test Time Aggregation",
+        "summary": "针对数学对象推理能力，发布了 Principia 训练数据集和基准测试。提出了强 LLM 评判者和验证器的训练方案，展示了 on-policy 评判训练可提升性能，并通过聚合扩展测试时计算能力。",
+        "category": "大语言模型 / 数学推理",
+        "authors": "Pranjal Aggarwal et al."
     },
     {
-        "title": "Out of Sight, Out of Mind? Evaluating State Evolution in Video World Models",
-        "summary": "提出 STEVO-Bench 基准，评估视频世界模型能否在不可见情况下正确模拟状态演化（如水倾倒、冰融化）。揭示了当前视频世界模型在解耦状态演化与观测方面的局限性。",
-        "category": "视频理解/世界模型",
-        "link": "https://arxiv.org/abs/2603.13215"
+        "title": "DriftGuard: Mitigating Asynchronous Data Drift in Federated Learning",
+        "summary": "提出了 DriftGuard 联邦持续学习框架，有效应对异步数据漂移问题。采用混合专家（MoE）架构分离共享参数和局部参数，实现全局和群体两种互补的重训练策略，在多个数据集上减少重训练成本高达 83%。",
+        "category": "联邦学习 / 持续学习",
+        "authors": "Yizhou Han et al."
     },
     {
-        "title": "Neuron-Aware Data Selection In Instruction Tuning For Large Language Models",
-        "summary": "提出 NAIT 框架，通过分析神经元激活模式相似性来选择指令微调数据。实验表明，使用 NAIT 选择的 10% Alpaca-GPT4 数据子集训练，效果优于使用外部高级模型或不确定性特征的方法。",
-        "category": "大语言模型/指令微调",
-        "link": "https://arxiv.org/abs/2603.13201"
+        "title": "Bridging Network Fragmentation: A Semantic-Augmented DRL Framework for UAV-aided VANETs",
+        "summary": "提出了语义增强深度强化学习（SA-DRL）框架，用于无人机辅助车联网。通过将 LLM 的语义推理能力注入策略作为先验，有效引导智能体朝向关键路口。仅用 26.6% 的训练回合即可达到基线性能， connectivity 指标提升 13.2%-23.5%。",
+        "category": "强化学习 / 无线网络",
+        "authors": "Gaoxiang Cao et al."
     },
     {
-        "title": "From Experiments to Expertise: Scientific Knowledge Consolidation for AI-Driven Computational Research",
-        "summary": "提出 QMatSuite 平台，使 AI 代理能够记录发现、检索知识并在反思会话中纠正错误。在量子力学模拟工作流中，累积知识将推理开销降低 67%，准确率从 47% 偏差提升至 3%。",
-        "category": "AI for Science/智能代理",
-        "link": "https://arxiv.org/abs/2603.13191"
+        "title": "Through the Looking-Glass: AI-Mediated Video Communication Reduces Interpersonal Trust",
+        "summary": "通过两项预注册在线实验（N=2000）研究 AI 中介视频通信对人际信任的影响。发现 AI 中介视频（如修图、背景替换、虚拟形象）会降低感知信任和判断信心，但实际判断准确性保持不变。",
+        "category": "人机交互 / AI 伦理",
+        "authors": "Nelson Navajas Fernández et al."
     },
     {
-        "title": "LLM Constitutional Multi-Agent Governance",
-        "summary": "提出宪制多智能体治理（CMAG）框架，结合硬约束过滤和软惩罚效用优化，平衡合作潜力与操纵风险。实验表明 CMAG 在保持自主性（0.985）和完整性（0.995）的同时，实现伦理合作分数 0.741。",
-        "category": "多智能体系统/AI 治理",
-        "link": "https://arxiv.org/abs/2603.13189"
+        "title": "RewardFlow: Topology-Aware Reward Propagation on State Graphs for Agentic RL with LLMs",
+        "summary": "提出了 RewardFlow 方法，用于代理强化学习中的状态级奖励估计。通过构建状态图并利用拓扑结构进行图传播，量化状态对成功的贡献。在四个代理推理基准测试上显著优于 prior RL 基线。",
+        "category": "强化学习 / 大语言模型",
+        "authors": "Xiao Feng et al."
     },
     {
-        "title": "Learnability and Privacy Vulnerability are Entangled in a Few Critical Weights",
-        "summary": "发现隐私漏洞仅存在于极小部分权重中，但这些权重也关键影响效用性能。提出仅重绕关键权重的方法，在保持效用的同时有效抵抗成员推断攻击。发表于 ICLR 2026。",
-        "category": "机器学习隐私/安全",
-        "link": "https://arxiv.org/abs/2603.13186"
+        "title": "Why Better Cross-Lingual Alignment Fails for Better Cross-Lingual Transfer: Case of Encoders",
+        "summary": "揭示了更好的跨语言对齐并不总能带来更好的跨语言迁移。通过表示分析发现：嵌入距离 alone 是不可靠的性能预测指标，对齐和任务梯度通常接近正交。提供了结合跨语言对齐与任务特定微调的实用指南。",
+        "category": "自然语言处理 / 跨语言学习",
+        "authors": "Yana Veitsman et al."
     },
     {
-        "title": "DiT-IC: Aligned Diffusion Transformer for Efficient Image Compression",
-        "summary": "提出 DiT-IC，一种对齐扩散 Transformer 用于图像压缩。通过三步对齐机制实现单步扩散，解码速度提升 30 倍，可在 16GB 笔记本 GPU 上重建 2048x2048 图像。",
-        "category": "图像压缩/扩散模型",
-        "link": "https://arxiv.org/abs/2603.13162"
+        "title": "A Human-in/on-the-Loop Framework for Accessible Text Generation",
+        "summary": "提出了混合框架，将人类参与明确整合到基于 LLM 的无障碍文本生成中。Human-in-the-Loop 指导生成过程中的调整，Human-on-the-Loop 确保系统化的生成后审查。建立了可追踪、可重现、可审计的无障碍文本创建流程。",
+        "category": "自然语言处理 / 无障碍技术",
+        "authors": "Lourdes Moreno et al."
     },
     {
-        "title": "ESG-Bench: Benchmarking Long-Context ESG Reports for Hallucination Mitigation",
-        "summary": "推出 ESG-Bench 基准数据集，用于评估大语言模型在 ESG 报告理解中的幻觉问题。提出任务特定的思维链（CoT）提示策略，显著减少幻觉，并可将改进迁移到其他 QA 基准。",
-        "category": "长上下文/幻觉缓解",
-        "link": "https://arxiv.org/abs/2603.13154"
+        "title": "RadioDiff-FS: Physics-Informed Manifold Alignment in Few-Shot Diffusion Models for Radio Map Construction",
+        "summary": "提出了 RadioDiff-FS 少样本扩散框架，用于高保真无线电地图构建。基于多路径无线电地图的理论分解，引入方向一致性损失约束扩散分数更新。在静态和动态无线电地图上分别减少 NMSE 59.5% 和 74.0%。",
+        "category": "扩散模型 / 无线通信",
+        "authors": "Xiucheng Wang et al."
     }
 ]
 
 # 研究方向总结
-research_directions = """
-<h3>🔬 研究方向分布</h3>
-<table style="width:100%; border-collapse: collapse; margin: 20px 0;">
-    <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-        <th style="padding: 12px; text-align: left; color: white;">研究方向</th>
-        <th style="padding: 12px; text-align: center; color: white;">论文数量</th>
-        <th style="padding: 12px; text-align: left; color: white;">占比</th>
-    </tr>
-    <tr style="background: #f8f9fa;">
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">🤖 机器人与具身智能</td>
-        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">2</td>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">20%</td>
-    </tr>
-    <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">👁️ 视觉与多模态</td>
-        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">3</td>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">30%</td>
-    </tr>
-    <tr style="background: #f8f9fa;">
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">🧠 大语言模型</td>
-        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">3</td>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">30%</td>
-    </tr>
-    <tr>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">🔒 隐私与安全</td>
-        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">1</td>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">10%</td>
-    </tr>
-    <tr style="background: #f8f9fa;">
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">🔬 AI for Science</td>
-        <td style="padding: 10px; text-align: center; border-bottom: 1px solid #dee2e6;">1</td>
-        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">10%</td>
-    </tr>
-</table>
+research_summary = """
+<h3>📈 研究方向总结</h3>
+<ul>
+    <li><strong>视觉语言模型 (VLM)</strong>: 空间推理基准测试、视觉上下文学习</li>
+    <li><strong>大语言模型推理</strong>: 数学推理、代理强化学习、奖励建模</li>
+    <li><strong>联邦学习</strong>: 异步数据漂移缓解、持续学习</li>
+    <li><strong>人机交互</strong>: AI 中介通信对信任的影响、无障碍文本生成</li>
+    <li><strong>跨语言学习</strong>: 跨语言对齐与迁移的理论与实践</li>
+    <li><strong>扩散模型应用</strong>: 物理信息引导的少样本学习</li>
+</ul>
 """
 
 # 核心趋势
 core_trends = """
-<h3>📈 核心趋势洞察</h3>
-<div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 20px; border-radius: 10px; margin: 20px 0;">
-    <div style="margin-bottom: 15px;">
-        <strong style="color: #667eea;">1️⃣ 具身智能爆发</strong>
-        <p style="margin: 8px 0 0 0; color: #555;">人形机器人运动控制、世界模型、开放世界具身代理成为热点，AI 正从纯软件走向物理世界交互。</p>
-    </div>
-    <div style="margin-bottom: 15px;">
-        <strong style="color: #667eea;">2️⃣ 视觉 - 语言深度融合</strong>
-        <p style="margin: 8px 0 0 0; color: #555;">视觉奖励建模、多模态概念瓶颈模型、视觉到代码任务表明 VLM 正在向更细粒度、更可靠的方向发展。</p>
-    </div>
-    <div style="margin-bottom: 15px;">
-        <strong style="color: #667eea;">3️⃣ 高效训练与推理</strong>
-        <p style="margin: 8px 0 0 0; color: #555;">神经元感知数据选择、扩散 Transformer 图像压缩、MXNorm 归一化等技术追求更高效率。</p>
-    </div>
-    <div style="margin-bottom: 15px;">
-        <strong style="color: #667eea;">4️⃣ AI 安全与治理</strong>
-        <p style="margin: 8px 0 0 0; color: #555;">多智能体治理框架、隐私漏洞分析、幻觉缓解等研究反映 AI 安全日益受到重视。</p>
-    </div>
-    <div>
-        <strong style="color: #667eea;">5️⃣ 科学 AI 实用化</strong>
-        <p style="margin: 8px 0 0 0; color: #555;">从实验到专家的知识积累系统、物理系统表示学习等表明 AI for Science 正走向成熟应用。</p>
-    </div>
-</div>
+<h3>🔮 核心趋势洞察</h3>
+<ol>
+    <li><strong>多模态推理深化</strong>: VLM 研究从基础感知向复杂组合推理演进，空间推理成为新焦点</li>
+    <li><strong>RL + LLM 融合</strong>: 强化学习与大语言模型结合，解决代理推理中的奖励稀疏问题</li>
+    <li><strong>高效学习范式</strong>: 联邦学习、少样本学习、持续学习受到关注，强调计算效率</li>
+    <li><strong>人本 AI 设计</strong>: 人机交互、无障碍技术、AI 伦理研究增多，关注 AI 对社会的影响</li>
+    <li><strong>领域专业化</strong>: 通用模型向专业领域（地理、通信、语言学习）深度适配</li>
+</ol>
 """
 
 # 构建 HTML 邮件内容
@@ -156,165 +117,124 @@ html_content = f"""
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📊 今日 AI 论文速递 - {TODAY}</title>
+    <title>今日 AI 论文速递 - {today}</title>
     <style>
         body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             line-height: 1.6;
             color: #333;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            background: #f5f7fa;
+            background-color: #f5f5f5;
         }}
         .container {{
-            background: white;
-            border-radius: 15px;
+            background-color: #ffffff;
+            border-radius: 10px;
             padding: 30px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }}
-        .header {{
+        h1 {{
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 15px;
+            text-align: center;
+        }}
+        h2 {{
+            color: #2980b9;
+            margin-top: 30px;
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+        }}
+        h3 {{
+            color: #27ae60;
+        }}
+        .paper {{
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 25px;
-            border-radius: 10px;
-            text-align: center;
-            margin-bottom: 30px;
-        }}
-        .header h1 {{
-            margin: 0;
-            font-size: 28px;
-        }}
-        .header p {{
-            margin: 10px 0 0 0;
-            opacity: 0.9;
-        }}
-        .paper-card {{
-            background: #f8f9fa;
-            border-left: 4px solid #667eea;
+            border-radius: 8px;
             padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 0 10px 10px 0;
-            transition: transform 0.2s;
-        }}
-        .paper-card:hover {{
-            transform: translateX(5px);
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }}
         .paper-title {{
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
-            color: #2d3748;
-            margin-bottom: 10px;
-        }}
-        .paper-title a {{
-            color: #667eea;
-            text-decoration: none;
-        }}
-        .paper-title a:hover {{
-            text-decoration: underline;
-        }}
-        .paper-category {{
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
             margin-bottom: 10px;
         }}
         .paper-summary {{
-            color: #555;
             font-size: 14px;
-            line-height: 1.7;
+            opacity: 0.95;
+            margin-bottom: 10px;
         }}
-        h2 {{
-            color: #2d3748;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-            margin-top: 30px;
+        .paper-meta {{
+            font-size: 12px;
+            opacity: 0.8;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
         }}
-        h3 {{
-            color: #4a5568;
-            margin-top: 25px;
+        .tag {{
+            background-color: rgba(255,255,255,0.2);
+            padding: 3px 10px;
+            border-radius: 15px;
+            display: inline-block;
+            margin: 3px;
+        }}
+        ul, ol {{
+            padding-left: 20px;
+        }}
+        li {{
+            margin: 8px 0;
         }}
         .footer {{
-            text-align: center;
             margin-top: 30px;
             padding-top: 20px;
-            border-top: 1px solid #e2e8f0;
-            color: #718096;
+            border-top: 1px solid #eee;
+            text-align: center;
+            color: #7f8c8d;
             font-size: 12px;
         }}
-        .stats {{
-            display: flex;
-            justify-content: space-around;
+        .highlight {{
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #ffc107;
             margin: 20px 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-            border-radius: 10px;
-        }}
-        .stat-item {{
-            text-align: center;
-            color: white;
-        }}
-        .stat-number {{
-            font-size: 32px;
-            font-weight: bold;
-        }}
-        .stat-label {{
-            font-size: 14px;
-            opacity: 0.9;
         }}
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>📊 今日 AI 论文速递</h1>
-            <p>{TODAY} | arXiv 24 小时最新论文精选</p>
-        </div>
+        <h1>📊 今日 AI 论文速递 - {today}</h1>
         
-        <div class="stats">
-            <div class="stat-item">
-                <div class="stat-number">10</div>
-                <div class="stat-label">精选论文</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number">5</div>
-                <div class="stat-label">研究方向</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number">24h</div>
-                <div class="stat-label">时间范围</div>
-            </div>
+        <div class="highlight">
+            <strong>📌 本期概要：</strong> 精选 arxiv 24 小时内提交的 10 篇 AI 领域最新论文，涵盖视觉语言模型、大语言模型推理、联邦学习、人机交互等前沿方向。
         </div>
 
-        <h2>📚 论文精选</h2>
+        <h2>📚 精选论文</h2>
 """
 
-# 添加论文卡片
+# 添加论文列表
 for i, paper in enumerate(papers, 1):
     html_content += f"""
-        <div class="paper-card">
-            <span class="paper-category">{paper['category']}</span>
-            <div class="paper-title">
-                <a href="{paper['link']}">{i}. {paper['title']}</a>
-            </div>
-            <div class="paper-summary">
-                {paper['summary']}
+        <div class="paper">
+            <div class="paper-title">#{i} {paper['title']}</div>
+            <div class="paper-summary">{paper['summary']}</div>
+            <div class="paper-meta">
+                <span class="tag">🏷️ {paper['category']}</span>
+                <span class="tag">✍️ {paper['authors']}</span>
             </div>
         </div>
 """
 
-# 添加研究方向和趋势
-html_content += research_directions
-html_content += core_trends
+html_content += research_summary + core_trends
 
-# 添加页脚
 html_content += f"""
         <div class="footer">
-            <p>数据来源：arXiv.org | 自动生成于 {TODAY}</p>
-            <p>🤖 AI 论文速递机器人 | leotangbot@163.com</p>
+            <p>📧 本邮件由 AI 自动整理发送 | 数据来源：arxiv.org</p>
+            <p>🔗 论文原文链接请访问 <a href="https://arxiv.org" style="color: #3498db;">arxiv.org</a></p>
+            <p>生成时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
         </div>
     </div>
 </body>
@@ -323,9 +243,9 @@ html_content += f"""
 
 # 创建邮件
 msg = MIMEMultipart('alternative')
-msg['Subject'] = Header(f"📊 今日 AI 论文速递 - {TODAY}", 'utf-8')
-msg['From'] = SENDER_EMAIL
-msg['To'] = RECEIVER_EMAIL
+msg['Subject'] = Header(f"📊 今日 AI 论文速递 - {today}", 'utf-8')
+msg['From'] = Header("Leo AI Bot <leotangbot@163.com>", 'utf-8')
+msg['To'] = Header("tangchengwen@163.com", 'utf-8')
 
 # 添加 HTML 内容
 html_part = MIMEText(html_content, 'html', 'utf-8')
@@ -343,8 +263,8 @@ try:
     
     print(f"✅ 邮件发送成功！")
     print(f"📧 收件人：{RECEIVER_EMAIL}")
-    print(f"📅 日期：{TODAY}")
-    print(f"📄 论文数量：{len(papers)}")
+    print(f"📅 日期：{today}")
+    print(f"📄 论文数量：{len(papers)} 篇")
 except Exception as e:
     print(f"❌ 邮件发送失败：{e}")
     raise

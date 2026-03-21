@@ -181,6 +181,27 @@
 
     <!-- 输入区域 -->
     <footer class="input-area">
+      <!-- Todo List 显示 -->
+      <div
+        v-if="todos.length > 0"
+        class="todo-list-wrapper"
+      >
+        <TodoList :todos="todos" />
+      </div>
+
+      <!-- Subtask Progress 显示 -->
+      <SubtaskProgress
+        v-if="currentSubtask"
+        :task-id="currentSubtask.taskId"
+        :description="currentSubtask.description"
+        :status="currentSubtask.status"
+        :tool-name="currentSubtask.toolName"
+        :tool-count="currentSubtask.toolCount"
+        :current="currentSubtask.current"
+        :total="currentSubtask.total"
+        :is-parallel="currentSubtask.isParallel"
+        :message="currentSubtask.message"
+      />
       <div
         class="input-container"
         :class="{ focused: isInputFocused }"
@@ -380,6 +401,8 @@ import { LoadingState, EmptyState, FileSelector, FilePreviewModal } from '@/comp
 import MessageItem from './MessageItem.vue'
 import MessageList from './MessageList.vue'
 import SessionPanel from './SessionPanel.vue'
+import TodoList from '@/components/chat/TodoList.vue'
+import SubtaskProgress from '@/components/chat/SubtaskProgress.vue'
 import SettingsPanel from '@/modules/settings/SettingsPanel.vue'
 import KnowledgeSearchSystem from '@/modules/knowledge/KnowledgeSearchSystem.vue'
 import ToolsPanel from '@/modules/tools/ToolsPanel.vue'
@@ -488,6 +511,33 @@ const maxHeartbeatFailures = 3
 let pendingMessages: string[] = []
 // 停止标记：停止后忽略后续到达的chunk
 let isStopping = false
+
+// Todo List 状态
+interface TodoItem {
+  id: string
+  content: string
+  activeForm?: string
+  status: 'pending' | 'in_progress' | 'completed'
+  createdAt?: string
+  updatedAt?: string
+}
+
+const todos = ref<TodoItem[]>([])
+
+// Subtask Progress 状态
+interface SubtaskProgress {
+  taskId: string
+  description: string
+  status: 'starting' | 'tool_call' | 'tool_result' | 'completed' | 'error'
+  toolName: string
+  toolCount: number
+  current: number
+  total: number
+  isParallel: boolean
+  message: string
+}
+
+const currentSubtask = ref<SubtaskProgress | null>(null)
 
 // 心跳机制
 function startHeartbeat() {
@@ -767,12 +817,44 @@ function connectWebSocket(sessionId: string) {
         currentStreamingMessage = null
         isStreaming.value = false
         isStopping = false
-        
+
         // 处理排队的消息
         if (pendingMessages.length > 0) {
           const nextMsg = pendingMessages.shift()!
           // 延迟发送，让UI有时间更新
           setTimeout(() => sendQueuedMessage(nextMsg), 100)
+        }
+      } else if (message.type === 'todo.updated') {
+        // Todo 列表更新
+        if (message.todos && Array.isArray(message.todos)) {
+          todos.value = message.todos.map((t: any) => ({
+            id: t.id || `todo-${Date.now()}-${Math.random()}`,
+            content: t.content || t.title || '',
+            activeForm: t.activeForm || '',
+            status: t.status === 'completed' ? 'completed' : t.status === 'in_progress' ? 'in_progress' : 'pending',
+            createdAt: t.createdAt || '',
+            updatedAt: t.updatedAt || ''
+          }))
+        }
+      } else if (message.type === 'subtask.updated') {
+        // Subtask 进度更新
+        currentSubtask.value = {
+          taskId: message.task_id || '',
+          description: message.description || '',
+          status: message.status || 'starting',
+          toolName: message.tool_name || '',
+          toolCount: message.tool_count || 0,
+          current: message.current || 0,
+          total: message.total || 0,
+          isParallel: message.is_parallel || false,
+          message: message.message || ''
+        }
+
+        // 如果任务完成或出错，清除 subtask
+        if (message.status === 'completed' || message.status === 'error') {
+          setTimeout(() => {
+            currentSubtask.value = null
+          }, 1500)
         }
       } else if (message.type === 'error') {
         console.error('[ChatWindow] Error:', message.message)
@@ -848,16 +930,20 @@ function initializeChat(sessionId: string) {
   if (sessionId === lastInitializedSessionId) {
     return
   }
-  
+
   lastInitializedSessionId = sessionId
-  
+
   // 清空当前消息
   messages.value = []
   currentStreamingMessage = null
-  
+
+  // 清空 Todo 和 Subtask 状态
+  todos.value = []
+  currentSubtask.value = null
+
   // 连接 WebSocket
   connectWebSocket(sessionId)
-  
+
   // 加载历史消息
   loadSessionMessages(sessionId)
 }
@@ -2158,6 +2244,12 @@ onBeforeUnmount(() => {
   margin: 0 auto;
   width: 100%;
   padding: var(--spacing-xl);
+}
+
+/* Todo List wrapper in footer */
+.todo-list-wrapper {
+  max-width: 820px;
+  margin: 0 auto 8px;
 }
 
 /* 输入区域 */

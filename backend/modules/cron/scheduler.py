@@ -265,6 +265,12 @@ class CronScheduler:
                 job.last_status = "skipped"
             
             if job.enabled:
+                # 检查是否需要在成功后自动删除
+                if job.delete_on_success:
+                    logger.info(f"Job completed successfully, deleting job: {job.name}")
+                    await service.delete_job(job.id)
+                    return
+
                 try:
                     job.next_run = service.calculate_next_run(
                         job.schedule,
@@ -274,27 +280,47 @@ class CronScheduler:
                     logger.error(f"Failed to calculate next run: {e}")
                     job.enabled = False
                     job.last_error = f"Invalid schedule: {e}"
-            
+
             await self._safe_commit(service.db)
             
         except Exception as e:
             logger.error(f"Job failed: {job.name} - {e}")
-            
+
             job.last_run = started_at
-            job.last_status = "error"
             job.last_error = str(e)[:1000]
             job.error_count = (job.error_count or 0) + 1
-            
-            if job.enabled:
-                try:
-                    job.next_run = service.calculate_next_run(
-                        job.schedule,
-                        base_time=started_at
-                    )
-                except Exception:
-                    job.enabled = False
-                    job.last_error = f"Failed to calculate next run: {e}"
-            
+            job.run_count = (job.run_count or 0) + 1
+
+            # 检查是否需要重试
+            if job.max_retries > 0 and job.retry_count < job.max_retries:
+                job.retry_count += 1
+                job.last_status = "retrying"
+                # 设置重试时间
+                retry_time = started_at + timedelta(seconds=job.retry_delay)
+                job.next_run = retry_time
+                logger.warning(
+                    f"Job failed, will retry in {job.retry_delay}s "
+                    f"(attempt {job.retry_count}/{job.max_retries}): {job.name}"
+                )
+            else:
+                # 重试耗尽或不重试
+                job.retry_count = 0
+                job.last_status = "error"
+
+                if job.retry_count > 0:
+                    logger.error(f"Job failed after {job.max_retries} retries: {job.name}")
+
+                # 按原定计划继续
+                if job.enabled:
+                    try:
+                        job.next_run = service.calculate_next_run(
+                            job.schedule,
+                            base_time=started_at
+                        )
+                    except Exception:
+                        job.enabled = False
+                        job.last_error = f"Failed to calculate next run: {e}"
+
             await self._safe_commit(service.db)
     
     async def _safe_commit(self, db):

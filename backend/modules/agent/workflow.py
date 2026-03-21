@@ -7,6 +7,7 @@ Execution modes:
 """
 
 import asyncio
+import inspect
 import json as _json
 from dataclasses import dataclass, field
 from enum import Enum
@@ -36,20 +37,33 @@ class AgentSlot:
     label: str
     prompt_template: str
     depends_on: list[str] = field(default_factory=list)
+    condition: dict | None = None  # 可选：执行条件
     phase: SlotPhase = SlotPhase.WAITING
     output: str | None = None
     error: str | None = None
+    skipped: bool = False  # 是否因条件不满足而跳过
 
 
 class WorkflowEngine:
     """多智能体工作流引擎 — 编排 Pipeline / Graph / Council 三种执行模式。"""
 
-    def __init__(self, subagent_manager, session_id: str | None = None, cancel_token=None, skills=None, task_board_id: str | None = None) -> None:
+    def __init__(
+        self,
+        subagent_manager,
+        session_id: str | None = None,
+        cancel_token=None,
+        skills=None,
+        task_board_id: str | None = None,
+        team_model_config: dict | None = None,
+        event_callback=None,
+    ) -> None:
         self._mgr = subagent_manager
         self._session_id = session_id
         self._cancel_token = cancel_token
         self._skills = skills  # 技能系统实例
         self._task_board_id = task_board_id  # 任务看板ID
+        self._team_model_config = team_model_config  # 团队模型配置
+        self._event_callback = event_callback
         # 每个 agent 的执行数据（工具调用 + 结论），最终序列化到结果中用于持久化
         self._execution_data: dict[str, dict] = {}
 
@@ -58,7 +72,15 @@ class WorkflowEngine:
     # ------------------------------------------------------------------
 
     async def _emit_ws(self, event_type: str, **data: Any) -> None:
-        """通过 WebSocket 推送工作流生命周期事件（fire-and-forget）。"""
+        """推送工作流事件到前端"""
+        if self._event_callback:
+            try:
+                maybe_result = self._event_callback(event_type, data)
+                if inspect.isawaitable(maybe_result):
+                    await maybe_result
+            except Exception as exc:
+                logger.warning(f"[Workflow] External event callback failed ({event_type}): {exc}")
+
         if not self._session_id:
             return
         try:
@@ -82,8 +104,21 @@ class WorkflowEngine:
             logger.warning(f"[Workflow] WS emit '{event_type}' failed: {exc}")
 
     def _is_cancelled(self) -> bool:
-        """检查取消令牌是否已触发。"""
-        return bool(self._cancel_token and self._cancel_token.is_cancelled)
+        """检查是否已取消"""
+        is_cancelled = bool(self._cancel_token and self._cancel_token.is_cancelled)
+        if is_cancelled:
+            # 如果工作流被取消，尝试取消所有运行中的子任务
+            asyncio.create_task(self._cancel_all_subagents())
+        return is_cancelled
+
+    async def _cancel_all_subagents(self) -> None:
+        """取消所有运行中的子任务"""
+        try:
+            cancelled = await self._mgr.cancel_all_tasks()
+            if cancelled > 0:
+                logger.info(f"[Workflow] Cancelled {cancelled} running subagent tasks")
+        except Exception as e:
+            logger.warning(f"[Workflow] Failed to cancel subagent tasks: {e}")
 
     async def _invoke_agent(
         self,
@@ -156,6 +191,8 @@ class WorkflowEngine:
             system_prompt=system_prompt,
             event_callback=_tool_event,
             enable_skills=enable_skills,  # 传递技能开关
+            model_override=self._team_model_config,  # 传递团队模型配置
+            cancel_token=self._cancel_token,  # 传递取消令牌
         )
         await self._mgr.execute_task(task_id)          # schedules asyncio.Task
         bg = self._mgr.running_tasks.get(task_id)
@@ -197,6 +234,27 @@ class WorkflowEngine:
             return False
 
         return any(_dfs(n) for n in dep_map if n not in visited)
+
+    def _evaluate_condition(self, condition: dict, slot_map: dict[str, "AgentSlot"]) -> bool:
+        """评估节点执行条件，通过检查依赖节点的LLM输出文本决定是否执行"""
+        if not condition:
+            return True
+
+        cond_type = condition.get("type")
+        node_id = condition.get("node")
+        text = condition.get("text", "")
+
+        if not node_id or node_id not in slot_map:
+            return False
+
+        output = slot_map[node_id].output or ""
+
+        if cond_type == "output_contains":
+            return text in output
+        elif cond_type == "output_not_contains":
+            return text not in output
+
+        return True
 
     def _build_exec_metadata(self) -> str:
         """将执行数据序列化为 HTML 注释块，嵌入 result 以便刷新后恢复面板状态。"""
@@ -280,10 +338,11 @@ class WorkflowEngine:
             sid = s.get("id", "")
             if not sid:
                 return "Error: every slot must have a non-empty 'id' field."
-            deps = s.get("depends", [])
+            deps = s.get("depends_on", s.get("depends", []))
             role = s.get("role", sid)
             task_desc = s.get("task", "")
             custom_sp = s.get("system_prompt") or None
+            condition = s.get("condition")
             slot_system_prompts[sid] = custom_sp or (
                 f"You are {role}. "
                 "You are a specialist agent inside a dependency-graph workflow. "
@@ -295,6 +354,7 @@ class WorkflowEngine:
                 label=role,
                 prompt_template=task_desc,
                 depends_on=list(deps),
+                condition=condition,
             )
             dep_map[sid] = list(deps)
 
@@ -315,7 +375,7 @@ class WorkflowEngine:
             ready = [
                 s for s in slot_map.values()
                 if s.phase == SlotPhase.WAITING
-                and all(slot_map[d].phase == SlotPhase.DONE for d in s.depends_on)
+                and all(slot_map[d].phase == SlotPhase.DONE or slot_map[d].skipped for d in s.depends_on)
             ]
             if not ready:
                 # 上游失败 → 标记下游为失败
@@ -327,11 +387,25 @@ class WorkflowEngine:
                         s.error = "Blocked by upstream failure"
                 break
 
+            # 检查条件并分离需要执行和跳过的节点
+            to_execute = []
             for s in ready:
+                if self._evaluate_condition(s.condition, slot_map):
+                    to_execute.append(s)
+                else:
+                    s.phase = SlotPhase.DONE
+                    s.skipped = True
+                    s.output = "[Skipped: condition not met]"
+                    logger.info(f"[Workflow/Graph] Slot '{s.slot_id}' skipped (condition not met)")
+
+            if not to_execute:
+                continue
+
+            for s in to_execute:
                 s.phase = SlotPhase.ACTIVE
             logger.info(
-                f"[Workflow/Graph] Dispatching {len(ready)} slot(s) in parallel: "
-                f"{[s.slot_id for s in ready]}"
+                f"[Workflow/Graph] Dispatching {len(to_execute)} slot(s) in parallel: "
+                f"{[s.slot_id for s in to_execute]}"
             )
 
             async def _run_slot(slot: AgentSlot) -> None:  # noqa: E306
@@ -340,7 +414,7 @@ class WorkflowEngine:
                     dep_parts = [
                         f"### {slot_map[d].label}:\n{slot_map[d].output}"
                         for d in slot.depends_on
-                        if slot_map[d].output
+                        if slot_map[d].output and not slot_map[d].skipped
                     ]
                     if dep_parts:
                         dep_ctx = "\n\n## Outputs from upstream agents:\n" + "\n\n".join(dep_parts)
@@ -364,12 +438,21 @@ class WorkflowEngine:
                     slot.error = str(exc)
                     logger.error(f"[Workflow/Graph] Slot '{slot.slot_id}' failed: {exc}")
 
-            await asyncio.gather(*[_run_slot(s) for s in ready])
+            await asyncio.gather(*[_run_slot(s) for s in to_execute])
 
         lines = [f"# Graph Workflow Results\n\n**Goal:** {goal}\n"]
         for slot in slot_map.values():
-            icon = "✅" if slot.phase == SlotPhase.DONE else "❌"
-            lines.append(f"## {icon} {slot.label}")
+            if slot.skipped:
+                icon = "⏭️"
+                status_text = "Skipped"
+            elif slot.phase == SlotPhase.DONE:
+                icon = "✅"
+                status_text = "Done"
+            else:
+                icon = "❌"
+                status_text = "Failed"
+
+            lines.append(f"## {icon} {slot.label} ({status_text})")
             if slot.output:
                 lines.append(slot.output)
             elif slot.error:

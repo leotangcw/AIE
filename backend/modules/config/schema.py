@@ -147,6 +147,35 @@ class FeishuConfig(BaseModel):
     allow_from: list[str] = Field(default_factory=list)
 
 
+class WeComConfig(BaseModel):
+    """企业微信渠道配置"""
+    enabled: bool = False
+    corp_id: str = ""
+    agent_id: str = ""
+    client_secret: str = ""
+    websocket_url: str = ""
+    allow_from: list[str] = Field(default_factory=list)
+
+
+class WeiboConfig(BaseModel):
+    """微博渠道配置"""
+    enabled: bool = False
+    app_id: str = ""
+    app_secret: str = ""
+    websocket_url: str = ""
+    allow_from: list[str] = Field(default_factory=list)
+
+
+class XiaozhiConfig(BaseModel):
+    """小智 AI 渠道配置"""
+    enabled: bool = False
+    app_id: str = ""
+    app_secret: str = ""
+    websocket_url: str = ""
+    enable_conversation: bool = False
+    allow_from: list[str] = Field(default_factory=list)
+
+
 class ChannelsConfig(BaseModel):
     """渠道配置"""
     telegram: TelegramConfig = Field(default_factory=TelegramConfig)
@@ -155,6 +184,9 @@ class ChannelsConfig(BaseModel):
     wechat: WeChatConfig = Field(default_factory=WeChatConfig)
     dingtalk: DingTalkConfig = Field(default_factory=DingTalkConfig)
     feishu: FeishuConfig = Field(default_factory=FeishuConfig)
+    wecom: WeComConfig = Field(default_factory=WeComConfig)
+    weibo: WeiboConfig = Field(default_factory=WeiboConfig)
+    xiaozhi: XiaozhiConfig = Field(default_factory=XiaozhiConfig)
 
 
 class AppConfig(BaseModel):

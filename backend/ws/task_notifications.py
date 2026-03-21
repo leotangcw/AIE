@@ -78,6 +78,22 @@ class TaskLogMessage(ServerMessage):
     timestamp: float
 
 
+class SubtaskUpdateMessage(ServerMessage):
+    """子任务进度更新消息 (用于 ChatPanel 的 SubtaskProgress 组件)"""
+
+    type: str = "subtask.updated"
+    task_id: str = ""
+    description: str = ""
+    status: str = ""  # "starting" | "tool_call" | "tool_result" | "completed" | "error"
+    tool_name: str = ""
+    tool_count: int = 0
+    current: int = 0
+    total: int = 0
+    is_parallel: bool = False
+    message: str = ""
+    session_id: str = ""
+
+
 # ============================================================================
 # Task Notification Handler
 # ============================================================================
@@ -306,6 +322,48 @@ class TaskNotificationManager:
         for handler in self.handlers.values():
             await handler.notify_status(handler.status, handler.progress)
 
+    async def emit_subtask_update(
+        self,
+        session_id: str,
+        task_id: str,
+        description: str,
+        status: str,
+        tool_name: str = "",
+        tool_count: int = 0,
+        current: int = 0,
+        total: int = 0,
+        is_parallel: bool = False,
+        message: str = "",
+    ) -> None:
+        """广播子任务进度更新
+
+        Args:
+            session_id: 会话 ID
+            task_id: 任务 ID
+            description: 任务描述
+            status: 状态 (starting, tool_call, tool_result, completed, error)
+            tool_name: 当前工具名称
+            tool_count: 工具调用总数
+            current: 当前进度
+            total: 总进度
+            is_parallel: 是否并行执行
+            message: 附加消息
+        """
+        subtask_msg = SubtaskUpdateMessage(
+            task_id=task_id,
+            description=description,
+            status=status,
+            tool_name=tool_name,
+            tool_count=tool_count,
+            current=current,
+            total=total,
+            is_parallel=is_parallel,
+            message=message,
+            session_id=session_id,
+        )
+        await connection_manager.send_to_session(session_id, subtask_msg)
+        logger.debug(f"[TaskNotificationManager] Emitted subtask.updated for task {task_id}, status={status}")
+
 
 # ============================================================================
 # Global Task Notification Manager
@@ -412,3 +470,43 @@ async def log_task_message(task_id: str, level: str, message: str) -> None:
     handler = task_notification_manager.get_handler(task_id)
     if handler:
         await handler.log(level, message)
+
+
+async def emit_subtask_update(
+    session_id: str,
+    task_id: str,
+    description: str,
+    status: str,
+    tool_name: str = "",
+    tool_count: int = 0,
+    current: int = 0,
+    total: int = 0,
+    is_parallel: bool = False,
+    message: str = "",
+) -> None:
+    """广播子任务进度更新（便捷函数）
+
+    Args:
+        session_id: 会话 ID
+        task_id: 任务 ID
+        description: 任务描述
+        status: 状态 (starting, tool_call, tool_result, completed, error)
+        tool_name: 当前工具名称
+        tool_count: 工具调用总数
+        current: 当前进度
+        total: 总进度
+        is_parallel: 是否并行执行
+        message: 附加消息
+    """
+    await task_notification_manager.emit_subtask_update(
+        session_id=session_id,
+        task_id=task_id,
+        description=description,
+        status=status,
+        tool_name=tool_name,
+        tool_count=tool_count,
+        current=current,
+        total=total,
+        is_parallel=is_parallel,
+        message=message,
+    )
