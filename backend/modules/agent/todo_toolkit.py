@@ -17,6 +17,45 @@ from backend.models.task_item import TaskItem, TaskScope, TaskStatus
 from backend.modules.agent.task_board import TaskBoardService
 
 
+# 魔法字符串：用于识别 Todo List 父任务
+TODO_LIST_DESCRIPTION = "LLM 管理的 Todo 列表"
+
+
+def _parse_todo_content(title: str) -> str:
+    """从任务标题中提取内容（去掉编号前缀）
+
+    Args:
+        title: 任务标题，格式如 "1. 写报告"
+
+    Returns:
+        去掉编号后的内容，如 "写报告"
+    """
+    if ". " in title:
+        parts = title.split(". ", 1)
+        if parts[0].isdigit():
+            return parts[1]
+    return title
+
+
+def _map_status_to_frontend(status: str) -> str:
+    """将后端状态映射为前端状态
+
+    Args:
+        status: 后端状态字符串
+
+    Returns:
+        前端状态字符串
+    """
+    status = status.lower() if status else "pending"
+    if status == "done":
+        return "completed"
+    elif status in ("failed", "cancelled"):
+        return "pending"
+    elif status == "running":
+        return "in_progress"
+    return "pending"
+
+
 class TodoStatus(str, Enum):
     """Todo 状态枚举"""
     WAITING = "waiting"      # 待执行
@@ -121,13 +160,7 @@ class TodoToolkit:
     def _task_to_frontend(self, task: TaskItem) -> FrontendTodoItem:
         """将 TaskItem 转换为前端格式"""
         # 状态映射
-        backend_status = task.status.lower() if task.status else "pending"
-        if backend_status == "done":
-            backend_status = "completed"
-        elif backend_status == "failed":
-            backend_status = "pending"
-
-        frontend_status = self._status_map.get(backend_status, "pending")
+        frontend_status = _map_status_to_frontend(task.status)
 
         # 时间格式化
         created_at = task.created_at.isoformat() if task.created_at else ""
@@ -135,7 +168,7 @@ class TodoToolkit:
 
         return FrontendTodoItem(
             id=task.id,
-            content=task.title,  # 使用 title 作为 content
+            content=_parse_todo_content(task.title),
             activeForm="",  # TodoToolkit 不追踪 activeForm
             status=frontend_status,
             createdAt=created_at,
@@ -156,7 +189,7 @@ class TodoToolkit:
             parent_tasks = await task_board.get_parent_tasks(self.session_id)
 
             # 找出所有 todo list (通过 description 识别)
-            todo_lists = [t for t in parent_tasks if "LLM 管理的 Todo 列表" in (t.description or "")]
+            todo_lists = [t for t in parent_tasks if TODO_LIST_DESCRIPTION in (t.description or "")]
 
             if not todo_lists:
                 return []
@@ -180,7 +213,7 @@ class TodoToolkit:
         async with db:
             task_board = await self._get_task_board(db)
             parent_tasks = await task_board.get_parent_tasks(self.session_id)
-            todo_lists = [t for t in parent_tasks if "LLM 管理的 Todo 列表" in (t.description or "")]
+            todo_lists = [t for t in parent_tasks if TODO_LIST_DESCRIPTION in (t.description or "")]
             return todo_lists[0] if todo_lists else None
 
     async def _save_tasks(self, tasks: list[TaskItem]) -> None:
@@ -256,7 +289,7 @@ class TodoToolkit:
                 title="Todo List",
                 task_type="todo",
                 session_id=self.session_id,
-                description="LLM 管理的 Todo 列表",
+                description=TODO_LIST_DESCRIPTION,
             )
 
             # 为每个任务创建子任务
@@ -548,7 +581,7 @@ class TodoToolkit:
                     title="Todo List",
                     task_type="todo",
                     session_id=self.session_id,
-                    description="LLM 管理的 Todo 列表",
+                    description=TODO_LIST_DESCRIPTION,
                 )
 
             # 删除旧的子任务
