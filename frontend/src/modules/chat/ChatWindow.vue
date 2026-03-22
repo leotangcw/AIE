@@ -418,7 +418,7 @@ import { useChatStore } from '@/store/chat'
 import { useToolsStore } from '@/store/tools'
 import { useToast } from '@/composables/useToast'
 import { useKeyboard, commonShortcuts } from '@/composables/useKeyboard'
-import { toolsAPI, authAPI } from '@/api/endpoints'
+import { toolsAPI, authAPI, todoAPI } from '@/api/endpoints'
 
 // 导入停止 API
 import { stopAPI } from '@/api/endpoints'
@@ -947,8 +947,28 @@ function initializeChat(sessionId: string) {
   // 连接 WebSocket
   connectWebSocket(sessionId)
 
-  // 加载历史消息
+  // 加载历史消息和 Todo 列表
   loadSessionMessages(sessionId)
+  loadSessionTodos(sessionId)
+}
+
+// Load todo list from backend
+async function loadSessionTodos(sessionId: string) {
+  try {
+    const response = await todoAPI.getSessionTodos(sessionId)
+    if (response.todos && Array.isArray(response.todos)) {
+      todos.value = response.todos.map((t: any) => ({
+        id: t.id || `todo-${Date.now()}-${Math.random()}`,
+        content: t.content || '',
+        activeForm: t.activeForm || '',
+        status: t.status === 'completed' ? 'completed' : t.status === 'in_progress' ? 'in_progress' : 'pending',
+        createdAt: t.createdAt || '',
+        updatedAt: t.updatedAt || ''
+      }))
+    }
+  } catch (error) {
+    console.error('Failed to load todo list:', error)
+  }
 }
 
 // Load messages from backend
