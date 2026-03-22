@@ -672,3 +672,27 @@ export const taskBoardAPI = {
     getSubtasks: (taskId: string): Promise<{ tasks: TaskItem[] }> =>
         apiClient.get(`/task-items/${taskId}/subtasks`),
 }
+
+// ============================================================================
+// Todo API - Todo 列表
+// ============================================================================
+
+export interface TodoItemResponse {
+    id: string
+    content: string
+    status: 'pending' | 'in_progress' | 'completed'
+    createdAt?: string
+    updatedAt?: string
+}
+
+export interface TodoListResponse {
+    todos: TodoItemResponse[]
+    session_id: string
+}
+
+// Todo API
+export const todoAPI = {
+    // 获取会话的 Todo 列表
+    getSessionTodos: (sessionId: string): Promise<TodoListResponse> =>
+        apiClient.get(`/todo/session/${sessionId}`),
+}

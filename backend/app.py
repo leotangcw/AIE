@@ -398,6 +398,7 @@ from backend.api.plugins import router as plugins_router
 from backend.api.agent_teams import router as agent_teams_router
 from backend.api.task_items import router as task_items_router
 from backend.api.heartbeat import router as heartbeat_router
+from backend.api.todo import router as todo_router
 from backend.modules.knowledge_hub.api import router as knowledge_hub_router
 
 app.include_router(auth_router)
@@ -422,6 +423,7 @@ app.include_router(plugins_router)
 app.include_router(agent_teams_router)
 app.include_router(task_items_router)
 app.include_router(heartbeat_router)
+app.include_router(todo_router)
 app.include_router(knowledge_hub_router)
 
 
