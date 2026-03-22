@@ -79,6 +79,7 @@ class TodoToolkit:
         "todo_insert",
         "todo_remove",
         "todo_clear",
+        "todo_update",
         "todo_list",
     ])
 
@@ -456,6 +457,105 @@ class TodoToolkit:
 
             return f"已清空所有待办任务（共删除 {len(tasks)} 个）"
 
+    async def todo_update(self, content: str) -> str:
+        """更新整个待办列表（模型直接传入格式化的待办内容）
+
+        这是最常用的工具，模型通过此工具增删改查待办事项。
+        传入格式为 markdown 列表，例如：
+        - [ ] 1. 写报告
+        - [x] 2. 发邮件
+        - [ ] 3. 看电影
+
+        Args:
+            content: 完整的待办列表内容（markdown 格式）
+
+        Returns:
+            str: 操作结果和当前待办列表
+        """
+        db = await self._get_db()
+        async with db:
+            task_board = await self._get_task_board(db)
+
+            # 解析 markdown 内容，提取任务列表
+            # 格式: - [ ] 1. 任务名  | status | result
+            # 或: - [x] 1. 任务名 | status | result
+            lines = content.strip().split('\n')
+            tasks_data = []
+            for line in lines:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if line.startswith('- '):
+                    # 解析状态
+                    if '[x]' in line or '[√]' in line:
+                        status = 'completed'
+                    elif '[-]' in line:
+                        status = 'cancelled'
+                    else:
+                        status = 'pending'
+
+                    # 提取任务描述（去掉 - [ ] 等前缀）
+                    text = line.replace('- [ ]', '').replace('- [x]', '').replace('- [-]', '').replace('-', '').strip()
+                    # 去掉开头的编号（如 "1. "）
+                    if '.' in text:
+                        parts = text.split('. ', 1)
+                        if parts[0].isdigit():
+                            text = parts[1]
+
+                    # 提取结果（如果有 | 分隔）
+                    if '|' in text:
+                        text = text.split('|')[0].strip()
+
+                    text = text.strip()
+                    if text:
+                        tasks_data.append({'content': text, 'status': status})
+
+            # 如果没有有效任务，返回错误
+            if not tasks_data:
+                return "错误：未解析到有效的待办任务"
+
+            # 获取或创建父任务
+            parent = await self._get_todo_list_parent()
+            if not parent:
+                # 创建新的待办列表
+                parent = await task_board.create_session_task(
+                    title="Todo List",
+                    task_type="todo",
+                    session_id=self.session_id,
+                    description="LLM 管理的 Todo 列表",
+                )
+
+            # 删除旧的子任务
+            old_children = await task_board.get_child_tasks(parent.id)
+            for child in old_children:
+                await task_board.db.delete(child)
+
+            # 创建新的子任务
+            new_tasks = []
+            for i, task_data in enumerate(tasks_data, 1):
+                task = await task_board.create_session_task(
+                    title=f"{i}. {task_data['content'][:100]}",
+                    task_type="todo",
+                    session_id=self.session_id,
+                    description=task_data['content'],
+                    parent_id=parent.id,
+                )
+                if task_data['status'] == 'completed':
+                    await task_board.complete_task(task.id)
+                new_tasks.append(task)
+
+            await task_board.db.commit()
+
+            # 重新加载并排序
+            task_board.db.expire_all()
+            all_tasks = await task_board.get_child_tasks(parent.id)
+            all_tasks.sort(key=lambda t: int(t.title.split(".")[0]) if "." in t.title and t.title[0].isdigit() else 0)
+
+            # 广播更新
+            await self._emit_todo_updated(all_tasks)
+
+            return f"已更新待办列表（共 {len(all_tasks)} 个任务）"
+
     async def todo_list(self) -> str:
         """列出所有待办任务
 
@@ -565,6 +665,20 @@ class TodoToolkit:
                 "parameters": {
                     "type": "object",
                     "properties": {},
+                },
+            },
+            {
+                "name": "todo_update",
+                "description": "更新整个待办列表。模型传入完整格式化的待办内容（markdown格式）。\n\n格式示例：\n- [ ] 1. 写报告\n- [x] 2. 发邮件\n- [ ] 3. 看电影\n\n推荐：优先使用此工具增删改待办，而不是逐个调用 todo_insert/todo_remove。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                            "description": "完整的待办列表内容（markdown格式）",
+                        }
+                    },
+                    "required": ["content"],
                 },
             },
             {
