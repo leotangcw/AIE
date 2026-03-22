@@ -161,9 +161,17 @@ class TodoToolkit:
             if not todo_lists:
                 return []
 
-            # 返回最新的 todo list 的子任务
+            # 获取最新的 todo list
             latest_todo_list = todo_lists[0]
+
+            # 检查是否有子任务，如果没有可能是孤立父任务
             children = await task_board.get_child_tasks(latest_todo_list.id)
+            if not children:
+                # 删除孤立父任务
+                await task_board.db.delete(latest_todo_list)
+                await task_board.db.commit()
+                return []
+
             return children
 
     async def _get_todo_list_parent(self) -> Optional[TaskItem]:
@@ -330,12 +338,23 @@ class TodoToolkit:
         async with db:
             task_board = await self._get_task_board(db)
 
-            # 获取现有的 todo list
+            # 清理可能存在的孤立父任务（有父任务但没有子任务）
             parent = await self._get_todo_list_parent()
+            if parent:
+                task_board.db.expire_all()  # 强制刷新
+                children = await task_board.get_child_tasks(parent.id)
+                if not children:
+                    # 孤立父任务，删除后当作没有todo list处理
+                    await task_board.db.delete(parent)
+                    await task_board.db.commit()
+                    parent = None
+
             if not parent:
                 # 如果没有 todo list，直接创建
                 return await self.todo_create(tasks)
 
+            # 获取现有子任务（强制刷新确保拿到最新数据）
+            task_board.db.expire_all()
             existing_tasks = await task_board.get_child_tasks(parent.id)
 
             # 解析现有任务的编号
