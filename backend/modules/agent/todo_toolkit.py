@@ -383,7 +383,7 @@ class TodoToolkit:
             return f"已插入 {len(tasks)} 个任务到位置 {insert_pos}"
 
     async def todo_remove(self, idx: int) -> str:
-        """删除任务
+        """删除任务（通过索引）
 
         Args:
             idx: 任务编号 (从 1 开始)
@@ -399,44 +399,25 @@ class TodoToolkit:
             if not tasks:
                 return "错误：没有待办列表"
 
-            # 找到对应编号的任务
-            target_task = None
-            for task in tasks:
-                if task.title.startswith(f"{idx}. "):
-                    target_task = task
-                    break
+            # 按编号排序确保 idx 对应正确的任务
+            sorted_tasks = sorted(tasks, key=lambda t: int(t.title.split(".")[0]) if "." in t.title and t.title[0].isdigit() else 0)
 
-            if not target_task:
-                return f"错误：任务编号 {idx} 不存在"
+            if idx < 1 or idx > len(sorted_tasks):
+                return f"错误：任务编号 {idx} 不存在（当前有 {len(sorted_tasks)} 个任务）"
+
+            # 获取要删除的任务（当前排序后的第 idx 个）
+            target_task = sorted_tasks[idx - 1]
+            parent_id = target_task.parent_id
 
             # 删除任务
-            task_id = target_task.id
-            parent_id = target_task.parent_id
             await task_board.db.delete(target_task)
             await task_board.db.commit()
 
-            # 重新加载剩余任务并重新编号 - 使用 fresh query 确保拿到最新数据
-            task_board.db.expire_all()  # 清除缓存（同步方法）
+            # 不重新编号，直接广播更新
+            task_board.db.expire_all()
+            all_tasks = await task_board.get_child_tasks(parent_id) if parent_id else []
+            all_tasks.sort(key=lambda t: int(t.title.split(".")[0]) if "." in t.title and t.title[0].isdigit() else 0)
 
-            if parent_id:
-                remaining = await task_board.get_child_tasks(parent_id)
-
-                # 按编号排序
-                remaining.sort(key=lambda t: int(t.title.split(".")[0]) if "." in t.title and t.title[0].isdigit() else 0)
-
-                # 重新编号 - 只处理有编号的任务
-                for i, task in enumerate(remaining, 1):
-                    num_str = task.title.split(". ")[0] if ". " in task.title else ""
-                    if num_str.isdigit():
-                        old_desc = task.title.split(". ", 1)[1] if ". " in task.title else task.title
-                        task.title = f"{i}. {old_desc}"
-
-                await task_board.db.commit()
-                all_tasks = remaining
-            else:
-                all_tasks = []
-
-            # 广播更新
             await self._emit_todo_updated(all_tasks)
 
             return f"已删除任务 {idx}"
