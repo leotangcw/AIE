@@ -133,20 +133,6 @@ class TodoToolkit:
         self._db = db
         self._lock = threading.Lock()
 
-        # 状态映射
-        self._status_map = {
-            "pending": "pending",  # PENDING 直接映射
-            "waiting": "pending",
-            "running": "in_progress",
-            "completed": "completed",
-            "cancelled": "pending",
-        }
-        self._reverse_status_map = {
-            "pending": TodoStatus.WAITING,
-            "in_progress": TodoStatus.RUNNING,
-            "completed": TodoStatus.COMPLETED,
-        }
-
     async def _get_db(self):
         """获取数据库会话"""
         if self._db is not None:
