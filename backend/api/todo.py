@@ -11,6 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_db
 from backend.models.task_item import TaskItem
 from backend.modules.agent.task_board import TaskBoardService
+from backend.modules.agent.todo_toolkit import (
+    TODO_LIST_DESCRIPTION,
+    _map_status_to_frontend,
+    _parse_todo_content,
+)
 
 router = APIRouter(prefix="/api/todo", tags=["todo"])
 
@@ -63,7 +68,7 @@ async def get_session_todo_list(
             # 找出 todo list (通过 description 识别)
             todo_lists = [
                 t for t in parent_tasks
-                if "LLM 管理的 Todo 列表" in (t.description or "")
+                if TODO_LIST_DESCRIPTION in (t.description or "")
             ]
 
             if not todo_lists:
@@ -80,28 +85,10 @@ async def get_session_todo_list(
             # 转换为前端格式
             todos = []
             for task in children:
-                # 状态映射
-                status = task.status.lower() if task.status else "pending"
-                if status == "done":
-                    status = "completed"
-                elif status in ("failed", "cancelled"):
-                    status = "pending"
-                elif status == "running":
-                    status = "in_progress"
-                else:
-                    status = "pending"
-
-                # 提取 content (去掉编号)
-                content = task.title
-                if ". " in content:
-                    parts = content.split(". ", 1)
-                    if parts[0].isdigit():
-                        content = parts[1]
-
                 todos.append(TodoItemResponse(
                     id=task.id,
-                    content=content,
-                    status=status,
+                    content=_parse_todo_content(task.title),
+                    status=_map_status_to_frontend(task.status),
                     createdAt=task.created_at.isoformat() if task.created_at else "",
                     updatedAt=task.updated_at.isoformat() if task.updated_at else "",
                 ))

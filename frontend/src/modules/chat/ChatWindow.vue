@@ -947,9 +947,11 @@ function initializeChat(sessionId: string) {
   // 连接 WebSocket
   connectWebSocket(sessionId)
 
-  // 加载历史消息和 Todo 列表
-  loadSessionMessages(sessionId)
-  loadSessionTodos(sessionId)
+  // 并行加载历史消息和 Todo 列表
+  Promise.all([
+    loadSessionMessages(sessionId),
+    loadSessionTodos(sessionId),
+  ])
 }
 
 // Load todo list from backend
