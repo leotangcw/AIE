@@ -229,15 +229,21 @@ class TodoToolkit:
         """
         db = await self._get_db()
         async with db:
+            task_board = await self._get_task_board(db)
+
             # 检查是否已存在 todo list
             existing = await self._get_todo_list_parent()
             if existing:
-                return f"错误：待办列表已存在。如需添加新任务，请使用 todo_insert。"
-
-            task_board = await self._get_task_board(db)
+                # 检查是否有子任务
+                children = await task_board.get_child_tasks(existing.id)
+                if children:
+                    return f"错误：待办列表已存在。如需添加新任务，请使用 todo_insert。"
+                else:
+                    # 有父任务但没有子任务（孤立状态），删除它后重新创建
+                    await task_board.db.delete(existing)
+                    await task_board.db.commit()
 
             # 创建父任务 (todo list)
-            now = datetime.utcnow()
             parent_task = await task_board.create_session_task(
                 title="Todo List",
                 task_type="todo",
