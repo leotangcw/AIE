@@ -96,6 +96,7 @@ class TodoToolkit:
 
         # 状态映射
         self._status_map = {
+            "pending": "pending",  # PENDING 直接映射
             "waiting": "pending",
             "running": "in_progress",
             "completed": "completed",
@@ -492,7 +493,7 @@ class TodoToolkit:
                     elif '[-]' in line:
                         status = 'cancelled'
                     else:
-                        status = 'pending'
+                        status = 'waiting'  # 使用 waiting 而非 pending，与 todo_list 显示一致
 
                     # 提取任务描述（去掉 - [ ] 等前缀）
                     text = line.replace('- [ ]', '').replace('- [x]', '').replace('- [-]', '').replace('-', '').strip()
@@ -571,7 +572,9 @@ class TodoToolkit:
         for task in tasks:
             status_icon = {
                 TodoStatus.WAITING.value: "[ ]",
+                "pending": "[ ]",  # PENDING 等同于 WAITING
                 TodoStatus.RUNNING.value: "[→]",
+                "in_progress": "[→]",
                 TodoStatus.COMPLETED.value: "[x]",
                 TodoStatus.CANCELLED.value: "[-]",
             }.get(task.status.lower() if task.status else "", "[?]")
