@@ -1,15 +1,13 @@
 """Todo List API - 提供 Todo 列表查询接口"""
 
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.models.task_item import TaskItem
 from backend.modules.agent.task_board import TaskBoardService
 from backend.modules.agent.todo_toolkit import (
     TODO_LIST_DESCRIPTION,
@@ -65,7 +63,7 @@ async def get_session_todo_list(
             # 获取会话的所有顶级任务
             parent_tasks = await task_board.get_parent_tasks(session_id)
 
-            # 找出 todo list (通过 description 识别)
+            # 找出 todo list (通过 description 识别)，按创建时间倒序取最新的
             todo_lists = [
                 t for t in parent_tasks
                 if TODO_LIST_DESCRIPTION in (t.description or "")
@@ -74,12 +72,17 @@ async def get_session_todo_list(
             if not todo_lists:
                 return TodoListResponse(todos=[], session_id=session_id)
 
+            # 按创建时间倒序，确保选择最新的 todo list
+            todo_lists.sort(key=lambda t: t.created_at or "", reverse=True)
             latest_todo_list = todo_lists[0]
 
             # 获取子任务
             children = await task_board.get_child_tasks(latest_todo_list.id)
 
+            # 清理孤立父任务（无子任务）
             if not children:
+                await task_board.db.delete(latest_todo_list)
+                await task_board.db.commit()
                 return TodoListResponse(todos=[], session_id=session_id)
 
             # 转换为前端格式
