@@ -19,11 +19,13 @@ import requests
 import feedparser
 
 # ============ 配置 ============
-SMTP_SERVER = "smtp.163.com"
-SMTP_PORT = 465
-SENDER_EMAIL = "leotangbot@163.com"
-SENDER_PASSWORD = "SWdqGSFtw34fRnie"
-RECEIVER_EMAIL = "tangchengwen@163.com"
+import os
+
+SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.163.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "your_email@163.com")
+SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD", "")
+RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL", "recipient@example.com")
 
 # TTS 配置
 TTS_VOICE = "zh-CN-YunyangNeural"  # 新闻播报风格
