@@ -158,13 +158,30 @@ def register_all_tools(
                 MemorySearchTool,
                 MemoryReadTool,
             )
-            
+
             tools.register(MemoryWriteTool(memory_store))
             tools.register(MemorySearchTool(memory_store))
             tools.register(MemoryReadTool(memory_store))
             logger.debug("Registered memory tools")
         except Exception as e:
             logger.error(f"Failed to register memory tools: {e}")
-    
+
+    # 9. 注册向量记忆工具 (Memory-MCP-Server)
+    try:
+        from backend.modules.tools.vector_memory_tool import (
+            VectorMemoryStoreTool,
+            VectorMemoryRecallTool,
+            VectorMemoryGetTool,
+            VectorMemoryStatsTool,
+        )
+
+        tools.register(VectorMemoryStoreTool())
+        tools.register(VectorMemoryRecallTool())
+        tools.register(VectorMemoryGetTool())
+        tools.register(VectorMemoryStatsTool())
+        logger.debug("Registered vector memory tools")
+    except Exception as e:
+        logger.warning(f"Failed to register vector memory tools: {e}")
+
     logger.debug(f"Registered {len(tools.get_definitions())} tools")
     return tools

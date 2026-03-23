@@ -150,6 +150,37 @@ async def lifespan(app: FastAPI):
     app.state.shared = shared
     logger.info("Shared components created")
 
+    # 初始化 MemoryPlugin (MCP Server 自动启动/停止)
+    logger.info("Initializing MemoryPlugin (MCP Server)...")
+    try:
+        from backend.modules.mcp.memory_plugin import init_memory_plugin, close_memory_plugin
+        from backend.modules.mcp.memory_adapter import init_memory_adapter_with_plugin
+
+        # 使用 AIE 的 memory 目录存储
+        memory_db_path = shared["workspace"] / "memory" / "vector_memory.db"
+        memory_plugin = await init_memory_plugin(
+            mcp_server_path=None,  # 使用默认路径
+            config_path=None,      # 使用默认配置
+            db_path=memory_db_path,
+            auto_start=True,
+        )
+
+        if memory_plugin and memory_plugin.is_running:
+            # 初始化 adapter 并关联 plugin
+            memory_adapter = init_memory_adapter_with_plugin(memory_plugin)
+            shared["memory_plugin"] = memory_plugin
+            shared["memory_adapter"] = memory_adapter
+            logger.info("MemoryPlugin started successfully")
+        else:
+            logger.warning("MemoryPlugin not available (MCP Server not started)")
+            shared["memory_plugin"] = None
+            shared["memory_adapter"] = None
+
+    except Exception as e:
+        logger.warning(f"MemoryPlugin init failed (optional): {e}")
+        shared["memory_plugin"] = None
+        shared["memory_adapter"] = None
+
     logger.info("Creating message queue and rate limiter...")
     message_queue = EnterpriseMessageQueue(
         enable_dedup=True, 
@@ -338,6 +369,15 @@ async def lifespan(app: FastAPI):
 
     # 正常关闭流程
     logger.info("Initiating graceful shutdown...")
+
+    # 停止 MemoryPlugin (MCP Server)
+    try:
+        from backend.modules.mcp.memory_plugin import close_memory_plugin
+        await close_memory_plugin()
+        logger.info("MemoryPlugin stopped")
+    except Exception as e:
+        logger.warning(f"MemoryPlugin shutdown error: {e}")
+
     await channel_manager.stop_all()
     await scheduler.stop()
 
@@ -400,12 +440,14 @@ from backend.api.task_items import router as task_items_router
 from backend.api.heartbeat import router as heartbeat_router
 from backend.api.todo import router as todo_router
 from backend.modules.knowledge_hub.api import router as knowledge_hub_router
+from backend.api.memory_vector import router as memory_vector_router
 
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(settings_router)
 app.include_router(tools_router)
 app.include_router(memory_router)
+app.include_router(memory_vector_router)
 app.include_router(skills_router)
 app.include_router(cron_router)
 app.include_router(tasks_router)

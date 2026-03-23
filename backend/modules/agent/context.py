@@ -167,11 +167,16 @@ class ContextBuilder:
 4. **禁止单次写入超长内容**: 绝对不要在一次 write_file 调用中传入超过 3000 字符的 content 参数
 
 ## 记忆系统
-工具: memory_write / memory_search / memory_read，静默调用，禁止在回复中输出记忆格式。
+**工具调用方式**: 当需要使用记忆工具时，**必须**通过函数调用机制传递参数，**禁止**在回复文本中描述工具调用。
 
-**仅在以下情况写入**: 用户要求记住、明确偏好习惯、重要决策结论、长期配置信息。
+工具: vector_memory_store / vector_memory_recall / vector_memory_get
+- vector_memory_store: 存储记忆（需要content和name参数）
+- vector_memory_recall: 搜索记忆（需要query参数）
+- vector_memory_get: 获取特定记忆（需要uri参数）
+
+**写入时机**: 用户要求记住、明确偏好习惯、重要决策结论、长期配置信息。
 **禁止写入**: 闲聊测试、一次性查询结果（天气/新闻/搜索）、临时数据、不确定价值的信息。
-**搜索**: 用户问过往信息或偏好时使用，支持多关键词AND搜索。
+**搜索**: 用户问过往信息或偏好时使用。
 **质量**: 必须含具体信息，精炼不超200字，多事项用；分隔。
 
 ## 安全准则（最高优先级）

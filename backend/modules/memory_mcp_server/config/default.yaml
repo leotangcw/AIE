@@ -1,0 +1,45 @@
+server:
+  host: "0.0.0.0"
+  port: 8765
+  mode: "stdio"  # stdio | http
+
+storage:
+  db_path: "./data/memory.db"
+  vector_dim: 1024  # bge-m3 = 1024
+  vector_table: "memory_vectors"
+
+embedding:
+  provider: "fallback"  # bge | local | openai | jina | fallback
+  model: "BAAI/bge-m3"
+  model_path: "/mnt/d/code/AIE_0302/AIE/models/bge-m3"  # Local model path
+  batch_size: 32
+  device: "cpu"
+
+llm:
+  provider: "openai"  # openai | volcengine | litellm
+  model: "gpt-4o-mini"  # for intent analysis and L0/L1 generation
+  api_key_env: "OPENAI_API_KEY"
+  enabled: true  # Set to false to disable LLM features (will use template fallback)
+
+retrieval:
+  alpha: 0.7              # semantic score weight
+  max_iterations: 10     # max retrieval iterations
+  convergence_rounds: 3   # convergence detection rounds
+  default_limit: 5
+
+rerank:
+  weights:
+    semantic: 0.5
+    hotness: 0.2
+    recency: 0.15
+    level: 0.1
+    type_match: 0.05
+
+tier:
+  auto_generate_l0: true  # Generate one-sentence abstract
+  auto_generate_l1: true  # Generate paragraph overview
+  generate_async: false    # true for background queue
+
+multitenancy:
+  enabled: true
+  tenant_id_header: "X-Tenant-ID"
