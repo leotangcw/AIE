@@ -401,9 +401,11 @@ app = FastAPI(
 import os as _os
 app.state.bind_host = _os.getenv("HOST", "127.0.0.1")
 
+# CORS 配置：从环境变量获取，允许跨域（仅开发环境使用）
+cors_origins = _os.getenv("CORS_ORIGINS", "").split(",") or ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

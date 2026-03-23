@@ -30,9 +30,14 @@ def validate_password(password: str) -> tuple[bool, str]:
 
 
 def hash_password(password: str) -> str:
-    """使用 SHA-256 + salt 哈希密码（避免额外依赖 bcrypt）"""
+    """使用 PBKDF2-SHA256 哈希密码（标准库实现，无需额外依赖）"""
     salt = secrets.token_hex(16)
-    hashed = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+    hashed = hashlib.pbkdf2_hmac(
+        'sha256',
+        password.encode('utf-8'),
+        salt.encode('utf-8'),
+        100000
+    ).hex()
     return f"{salt}:{hashed}"
 
 
@@ -41,7 +46,12 @@ def verify_password(password: str, stored_hash: str) -> bool:
     if not stored_hash or ":" not in stored_hash:
         return False
     salt, expected_hash = stored_hash.split(":", 1)
-    actual_hash = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+    actual_hash = hashlib.pbkdf2_hmac(
+        'sha256',
+        password.encode('utf-8'),
+        salt.encode('utf-8'),
+        100000
+    ).hex()
     return secrets.compare_digest(actual_hash, expected_hash)
 
 
