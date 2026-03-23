@@ -47,9 +47,8 @@ frontend/node_modules/
 logs/
 *.log
 
-# Data
-data/*.db
-data/*.json
+# Data - 敏感数据，禁止提交
+data/
 !data/.gitkeep
 
 # Environment
