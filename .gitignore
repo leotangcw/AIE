@@ -67,3 +67,7 @@ Thumbs.db
 refcode/
 .github_token
 memory/vector_store.db
+
+# Vector memory database
+memory/*.db
+memory/vector_store.db
