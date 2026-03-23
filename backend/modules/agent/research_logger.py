@@ -84,6 +84,11 @@ class ResearchLogger:
         # Track active sessions
         self._active_sessions: set = set()
 
+        # Index cache for performance
+        self._index_cache: dict = {"sessions": []}
+        self._index_loaded: bool = False
+        self._index_lock: Lock = Lock()
+
         logger.info(f"Research logger initialized at {self.storage_dir}")
 
     def _get_lock(self, session_id: str) -> Lock:
@@ -283,44 +288,56 @@ class ResearchLogger:
                     entry = buffer.popleft()
                     f.write(entry.to_jsonl() + "\n")
 
-    def _update_session_index(self, session_id: str, query: str = None):
-        """Update session index"""
-        index_data = {"sessions": []}
-
+    def _load_index_cache(self):
+        """Load index into cache if not already loaded"""
+        if self._index_loaded:
+            return
         if self.index_file.exists():
             try:
-                index_data = json.loads(self.index_file.read_text(encoding="utf-8"))
+                self._index_cache = json.loads(self.index_file.read_text(encoding="utf-8"))
             except Exception:
-                pass
-
-        sessions = index_data.get("sessions", [])
-
-        # Check if session already exists
-        existing = None
-        for i, s in enumerate(sessions):
-            if s.get("id") == session_id:
-                existing = i
-                break
-
-        session_entry = {
-            "id": session_id,
-            "query": query,
-            "started_at": datetime.now().isoformat(),
-            "file": f"{session_id}.jsonl",
-        }
-
-        if existing is not None:
-            sessions[existing] = session_entry
+                self._index_cache = {"sessions": []}
         else:
-            sessions.insert(0, session_entry)
+            self._index_cache = {"sessions": []}
+        self._index_loaded = True
 
-        # Keep only last 1000 sessions
-        index_data["sessions"] = sessions[:1000]
+    def _update_session_index(self, session_id: str, query: str = None):
+        """Update session index (thread-safe with atomic write)"""
+        with self._index_lock:
+            # Load index into cache if needed
+            self._load_index_cache()
 
-        self.index_file.write_text(
-            json.dumps(index_data, ensure_ascii=False, indent=2),
-            encoding="utf-8"
-        )
+            sessions = self._index_cache.get("sessions", [])
+
+            # Check if session already exists
+            existing = None
+            for i, s in enumerate(sessions):
+                if s.get("id") == session_id:
+                    existing = i
+                    break
+
+            session_entry = {
+                "id": session_id,
+                "query": query,
+                "started_at": datetime.now().isoformat(),
+                "file": f"{session_id}.jsonl",
+            }
+
+            if existing is not None:
+                sessions[existing] = session_entry
+            else:
+                sessions.insert(0, session_entry)
+
+            # Keep only last 1000 sessions
+            self._index_cache["sessions"] = sessions[:1000]
+
+            # Atomic write: write to temp file then rename
+            temp_file = self.index_file.with_suffix(".tmp")
+            temp_file.write_text(
+                json.dumps(self._index_cache, ensure_ascii=False, indent=2),
+                encoding="utf-8"
+            )
+            temp_file.replace(self.index_file)
 
     def get_session_log(self, session_id: str, limit: int = None) -> list[dict]:
         """Get all log entries for a session"""
@@ -354,15 +371,9 @@ class ResearchLogger:
 
     def get_recent_sessions(self, limit: int = 20) -> list[dict]:
         """Get recent session summaries"""
-        if not self.index_file.exists():
-            return []
-
-        try:
-            index_data = json.loads(self.index_file.read_text(encoding="utf-8"))
-            sessions = index_data.get("sessions", [])[:limit]
-            return sessions
-        except Exception:
-            return []
+        with self._index_lock:
+            self._load_index_cache()
+            return self._index_cache.get("sessions", [])[:limit]
 
     def search_logs(
         self,
@@ -454,19 +465,27 @@ class ResearchLogger:
             except Exception as e:
                 logger.warning(f"Failed to clean up {session_file}: {e}")
 
-        # Update index
-        if self.index_file.exists():
+        # Update index (read fresh, then atomic write)
+        with self._index_lock:
             try:
-                index_data = json.loads(self.index_file.read_text(encoding="utf-8"))
+                if self.index_file.exists():
+                    index_data = json.loads(self.index_file.read_text(encoding="utf-8"))
+                else:
+                    index_data = {"sessions": []}
                 sessions = [
                     s for s in index_data.get("sessions", [])
                     if (self.sessions_dir / s["file"]).exists()
                 ]
                 index_data["sessions"] = sessions
-                self.index_file.write_text(
+                # Atomic write
+                temp_file = self.index_file.with_suffix(".tmp")
+                temp_file.write_text(
                     json.dumps(index_data, ensure_ascii=False, indent=2),
                     encoding="utf-8"
                 )
+                temp_file.replace(self.index_file)
+                # Update cache
+                self._index_cache = index_data
             except Exception as e:
                 logger.warning(f"Failed to update index: {e}")
 

@@ -137,7 +137,7 @@ async def get_consolidation_status():
 
     # 获取已沉淀的解决方案
     solutions = consolidator.get_solutions(limit=10)
-    solutions_count = len(consolidator.get_solutions(limit=1000))
+    solutions_count = consolidator.count_solutions()
 
     return {
         "pending_sessions": pending_count,

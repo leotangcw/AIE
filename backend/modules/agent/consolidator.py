@@ -228,6 +228,10 @@ class Consolidator:
 
         return solutions
 
+    def count_solutions(self) -> int:
+        """获取解决方案总数（不读取文件内容）"""
+        return len(list(self.solutions_dir.glob("*.json")))
+
 
 # 全局实例
 _consolidator: Optional[Consolidator] = None
