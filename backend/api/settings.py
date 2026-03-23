@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.modules.config.loader import config_loader
-from backend.modules.config.schema import AppConfig, ModelConfig, ProviderConfig, WorkspaceConfig
+from backend.modules.config.schema import AppConfig, ModelConfig, ProviderConfig, ToolHistoryConfig, WorkspaceConfig
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -150,7 +150,7 @@ class HeartbeatConfigResponse(BaseModel):
 
 class PersonaConfigResponse(BaseModel):
     """用户信息和AI人设配置响应"""
-    
+
     ai_name: str = Field(..., description="AI的名字")
     user_name: str = Field(..., description="用户的称呼")
     user_address: str = Field(default="", description="用户的常用地址")
@@ -160,23 +160,31 @@ class PersonaConfigResponse(BaseModel):
     heartbeat: HeartbeatConfigResponse = Field(..., description="主动问候配置")
 
 
+class ToolHistoryConfigResponse(BaseModel):
+    """工具调用历史配置响应"""
+    retention_mode: str = Field(..., description="保留模式：count=按次数限制, complete=完整保留")
+    per_session_max: int = Field(..., description="每个会话最大工具调用记录数")
+
+
 class SettingsResponse(BaseModel):
     """设置响应"""
-    
+
     providers: dict[str, ProviderConfigResponse] = Field(..., description="Provider 配置")
     model: ModelConfigResponse = Field(..., description="模型配置")
     workspace: WorkspaceConfigResponse = Field(..., description="工作空间配置")
     security: SecurityConfigResponse = Field(..., description="安全配置")
+    tool_history: ToolHistoryConfigResponse = Field(..., description="工具调用历史配置")
     persona: PersonaConfigResponse = Field(..., description="用户信息和AI人设配置")
 
 
 class UpdateSettingsRequest(BaseModel):
     """更新设置请求"""
-    
+
     providers: dict[str, dict] | None = Field(None, description="Provider 配置")
     model: dict | None = Field(None, description="模型配置")
     workspace: dict | None = Field(None, description="工作空间配置")
     security: dict | None = Field(None, description="安全配置")
+    tool_history: dict | None = Field(None, description="工具调用历史配置")
     persona: dict | None = Field(None, description="用户信息和AI人设配置")
 
 
@@ -271,6 +279,10 @@ async def get_settings() -> SettingsResponse:
                 command_timeout=config.security.command_timeout,
                 max_output_length=config.security.max_output_length,
                 restrict_to_workspace=config.security.restrict_to_workspace,
+            ),
+            tool_history=ToolHistoryConfigResponse(
+                retention_mode=config.tool_history.retention_mode,
+                per_session_max=config.tool_history.per_session_max,
             ),
             persona=PersonaConfigResponse(
                 ai_name=config.persona.ai_name,
@@ -378,7 +390,14 @@ async def update_settings(request: UpdateSettingsRequest, req: Request) -> Setti
             
             if "restrict_to_workspace" in request.security:
                 config.security.restrict_to_workspace = request.security["restrict_to_workspace"]
-        
+
+        if request.tool_history:
+            if "retention_mode" in request.tool_history:
+                config.tool_history.retention_mode = request.tool_history["retention_mode"]
+
+            if "per_session_max" in request.tool_history:
+                config.tool_history.per_session_max = request.tool_history["per_session_max"]
+
         if request.persona:
             if "ai_name" in request.persona:
                 config.persona.ai_name = request.persona["ai_name"]

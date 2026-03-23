@@ -104,6 +104,29 @@ AIE/
 
 ## 开发规范
 
+### 敏感信息安全
+
+**禁止提交到 GitHub 的内容**：
+
+| 类型 | 示例 |
+|------|------|
+| API Keys | `sk-sp-xxx`, `DASHSCOPE_API_KEY=xxx` |
+| SMTP 密码/授权码 | `SENDER_PASSWORD = "xxx"` |
+| 数据库文件 | `*.db`, `*.sqlite` |
+| 日志文件 | `*.log`, `audit_*.log` |
+| 环境配置文件 | `.env` |
+| 备份文件 | `*.bak`, `*.backup` |
+
+**正确做法**：
+- 使用 `.env.example` 模板文件
+- 敏感配置通过环境变量读取：`os.environ.get("API_KEY", "")`
+- 已在 `.gitignore` 中排除：`data/`、`.env`、`*.log`、`*.db`
+
+**已泄露敏感数据的处理**：
+1. 立即在 Provider 控制台删除/禁用泄露的 API Key
+2. 使用 BFG Repo-Cleaner 清理 GitHub 历史
+3. Force push 后通知协作者重新 clone
+
 ### 代码风格
 - Python: 遵循 PEP 8，使用 Black 格式化
 - TypeScript/Vue: 使用 ESLint + Prettier

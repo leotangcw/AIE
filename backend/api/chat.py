@@ -23,6 +23,7 @@ from backend.modules.providers.litellm_provider import LiteLLMProvider
 from backend.modules.session.manager import SessionManager
 from backend.modules.session.runtime_config import get_session_model_override
 from backend.modules.tools.registry import ToolRegistry
+from backend.modules.tools.conversation_history import get_conversation_history
 from backend.utils.paths import WORKSPACE_DIR
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -485,7 +486,17 @@ async def send_message(
                         role="assistant",
                         content=assistant_content,
                     )
-                    
+
+                    # 回填 message_id 到该会话的未关联工具调用记录
+                    try:
+                        conversation_history = get_conversation_history()
+                        await conversation_history.backfill_message_id(
+                            session_id=request.session_id,
+                            message_id=assistant_message.id,
+                        )
+                    except Exception as backfill_err:
+                        logger.warning(f"Failed to backfill message_id (non-fatal): {backfill_err}")
+
                     # 发送完成事件
                     yield f"event: done\ndata: {json.dumps({'message_id': str(assistant_message.id)})}\n\n"
                     

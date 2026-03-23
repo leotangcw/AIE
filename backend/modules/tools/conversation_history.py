@@ -120,7 +120,7 @@ class ToolConversationHistory:
     
     async def _save_to_db(self, conversation: ToolConversation):
         """保存对话记录到数据库，并自动清理超过限制的旧记录
-        
+
         Args:
             conversation: 对话记录
         """
@@ -128,7 +128,8 @@ class ToolConversationHistory:
             from backend.database import get_db
             from backend.models.tool_conversation import ToolConversation as DBToolConversation
             from sqlalchemy import select, func, delete
-            
+            from backend.modules.config.loader import config_loader
+
             async for db in get_db():
                 # 1. 保存新记录
                 db_conv = DBToolConversation(
@@ -143,28 +144,41 @@ class ToolConversationHistory:
                     error=conversation.error,
                     duration_ms=conversation.duration_ms,
                 )
-                
+
                 db.add(db_conv)
                 await db.commit()
-                
-                # 2. 检查总记录数
-                count_query = select(func.count()).select_from(DBToolConversation)
+
+                # 2. 根据配置决定是否清理
+                tool_history_config = config_loader.config.tool_history
+
+                # complete 模式：完整保留，不清理
+                if tool_history_config.retention_mode == "complete":
+                    break
+
+                # count 模式：per-session 限制
+                max_records = tool_history_config.per_session_max
+                count_query = select(func.count()).select_from(DBToolConversation).where(
+                    DBToolConversation.session_id == conversation.session_id
+                )
                 result = await db.execute(count_query)
-                total_count = result.scalar()
-                
-                # 3. 如果超过 200 条，删除最旧的记录
-                max_records = 200
-                if total_count > max_records:
-                    records_to_delete = total_count - max_records
-                    logger.info(f"工具对话历史超过 {max_records} 条，删除最旧的 {records_to_delete} 条记录")
-                    
-                    # 获取最旧的记录 ID
-                    oldest_query = select(DBToolConversation.id).order_by(
+                session_count = result.scalar()
+
+                if session_count > max_records:
+                    records_to_delete = session_count - max_records
+                    logger.info(
+                        f"会话 {conversation.session_id} 工具调用历史超过 {max_records} 条，"
+                        f"删除最旧的 {records_to_delete} 条记录"
+                    )
+
+                    # 获取该会话最旧的记录 ID
+                    oldest_query = select(DBToolConversation.id).where(
+                        DBToolConversation.session_id == conversation.session_id
+                    ).order_by(
                         DBToolConversation.timestamp.asc()
                     ).limit(records_to_delete)
                     oldest_result = await db.execute(oldest_query)
                     oldest_ids = [row[0] for row in oldest_result.fetchall()]
-                    
+
                     # 删除最旧的记录
                     if oldest_ids:
                         delete_query = delete(DBToolConversation).where(
@@ -173,9 +187,9 @@ class ToolConversationHistory:
                         await db.execute(delete_query)
                         await db.commit()
                         logger.info(f"已删除 {len(oldest_ids)} 条最旧的工具对话记录")
-                
+
                 break
-                
+
         except Exception as e:
             logger.error(f"Failed to save conversation to database: {e}")
     

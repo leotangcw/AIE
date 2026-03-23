@@ -1,6 +1,6 @@
 """配置数据模型"""
 
-from typing import Optional
+from typing import Optional, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -176,6 +176,18 @@ class XiaozhiConfig(BaseModel):
     allow_from: list[str] = Field(default_factory=list)
 
 
+class ToolHistoryConfig(BaseModel):
+    """工具调用历史配置"""
+    retention_mode: Literal["count", "complete"] = Field(
+        default="count",
+        description="保留模式：count=按次数限制, complete=完整保留"
+    )
+    per_session_max: int = Field(
+        default=500, ge=1, le=10000,
+        description="每个会话最大工具调用记录数（count 模式）"
+    )
+
+
 class ChannelsConfig(BaseModel):
     """渠道配置"""
     telegram: TelegramConfig = Field(default_factory=TelegramConfig)
@@ -195,6 +207,7 @@ class AppConfig(BaseModel):
     model: ModelConfig = Field(default_factory=ModelConfig)
     workspace: WorkspaceConfig = Field(default_factory=WorkspaceConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
+    tool_history: ToolHistoryConfig = Field(default_factory=ToolHistoryConfig)
     channels: ChannelsConfig = Field(default_factory=ChannelsConfig)
     persona: PersonaConfig = Field(default_factory=PersonaConfig)
     theme: str = "auto"
