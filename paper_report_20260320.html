@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 今日 AI 论文速递 - 2026-03-20</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: #fff; padding: 40px; text-align: center; }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header .date { font-size: 16px; opacity: 0.9; }
+        .header .stats { display: flex; justify-content: center; gap: 30px; margin-top: 20px; }
+        .header .stat-item { background: rgba(255,255,255,0.2); padding: 10px 20px; border-radius: 20px; font-size: 14px; }
+        .content { padding: 40px; }
+        .section-title { font-size: 22px; color: #1e3c72; margin: 30px 0 20px; padding-bottom: 10px; border-bottom: 3px solid #667eea; }
+        .paper-card { background: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 15px 0; border-radius: 8px; transition: transform 0.2s; }
+        .paper-card:hover { transform: translateX(5px); }
+        .paper-title { font-size: 16px; font-weight: 600; color: #1e3c72; margin-bottom: 8px; }
+        .paper-id { font-size: 12px; color: #666; background: #e9ecef; padding: 2px 8px; border-radius: 10px; display: inline-block; margin-bottom: 10px; }
+        .paper-abstract { font-size: 14px; color: #555; line-height: 1.7; }
+        .paper-tag { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 12px; margin: 5px 5px 0 0; font-weight: 500; }
+        .tag-cv { background: #e3f2fd; color: #1976d2; }
+        .tag-llm { background: #f3e5f5; color: #7b1fa2; }
+        .tag-rl { background: #e8f5e9; color: #388e3c; }
+        .tag-nlp { background: #fff3e0; color: #f57c00; }
+        .tag-opt { background: #fce4ec; color: #c2185b; }
+        .trend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0; }
+        .trend-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 25px; border-radius: 12px; }
+        .trend-card h4 { font-size: 16px; margin-bottom: 10px; }
+        .trend-card p { font-size: 13px; opacity: 0.9; }
+        .trend-icon { font-size: 24px; margin-bottom: 10px; }
+        .distribution { background: #f8f9fa; padding: 25px; border-radius: 12px; margin: 20px 0; }
+        .bar-chart { margin: 15px 0; }
+        .bar-item { display: flex; align-items: center; margin: 10px 0; }
+        .bar-label { width: 140px; font-size: 13px; font-weight: 500; }
+        .bar-container { flex: 1; background: #e9ecef; height: 24px; border-radius: 12px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 12px; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; font-size: 12px; font-weight: 600; color: #fff; }
+        .footer { background: #f8f9fa; padding: 20px 40px; text-align: center; font-size: 13px; color: #666; border-top: 1px solid #e9ecef; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e9ecef; }
+        th { background: #f8f9fa; font-weight: 600; color: #1e3c72; }
+        tr:hover { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 今日 AI 论文速递</h1>
+            <div class="date">2026 年 3 月 20 日 · arXiv 24 小时内提交</div>
+            <div class="stats">
+                <div class="stat-item">📄 精选 10 篇</div>
+                <div class="stat-item">🔬 5 大方向</div>
+                <div class="stat-item">⚡ 高效推理</div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <h2 class="section-title">📋 精选论文</h2>
+            
+            <div class="paper-card">
+                <div class="paper-title">Unified Spatio-Temporal Token Scoring for Efficient Video VLMs</div>
+                <div class="paper-id">arXiv:2603.18004 · cs.CV</div>
+                <div class="paper-abstract">提出 STTS 模块，在 ViT 和 LLM 中统一修剪视觉 token，无需文本条件或 token 合并。在 13 个视频 QA 任务上仅性能下降 0.7%，训练和推理效率提升 62%。</div>
+                <span class="paper-tag tag-cv">👁️ 视觉语言</span>
+                <span class="paper-tag tag-opt">⚡ 效率优化</span>
+            </div>
+            
+            <div class="paper-card">
+                <div class="paper-title">AgentFactory: A Self-Evolving Framework Through Executable Subagent Accumulation and Reuse</div>
+                <div class="paper-id">arXiv:2603.18000 · cs.AI</div>
+                <div class="paper-abstract">提出自进化 Agent 新范式，将成功任务解决方案保存为可执行子代理代码而非文本经验。子代理持续基于执行反馈优化，实现能力持续积累。</div>
+                <span class="paper-tag tag-llm">🤖 Agent</span>
+                <span class="paper-tag tag-opt">🔄 自进化</span>
+            </div>
+            
+            <div class="paper-card">
+                <div class="paper-title">Loc3R-VLM: Language-based Localization and 3D Reasoning with Vision-Language Models</div>
+                <div class="paper-id">arXiv:2603.18002 · cs.CV</div>
+                <div class="paper-abstract">为 2D VLM 赋予 3D 理解能力，通过全局布局重建和显式情境建模提供空间监督。在语言定位和 3D 问答基准上达到 SOTA。</div>
+                <span class="paper-tag tag-cv">🌐 3D 理解</span>
+                <span class="paper-tag tag-llm">💬 多模态</span>
+            </div>
+            
+            <div class="paper-card">
+                <div class="paper-title">Beyond Muon: MUD (MomentUm Decorrelation) for Faster Transformer Training</div>
+                <div class="paper-id">arXiv:2603.17970 · cs.LG</div>
+                <div class="paper-abstract">提出 MUD 优化器，用三角白化替代 Muon 的极分解更新。在达到困惑度时间上比 AdamW 和 Muon 快 10-50%，tokens/s 提升 1.3-2.6 倍。</div>
+                <span class="paper-tag tag-opt">⚙️ 优化器</span>
+                <span class="paper-tag tag-llm">🚀 训练加速</span>
+            </div>
+            
+            <div class="paper-card">
+                <div class="paper-title">The Unreasonable Effectiveness of Text Embedding Interpolation for Continuous Image Steering</div>
+                <div class="paper-id">arXiv:2603.17998 · cs.CV</div>
+                <div class="paper-abstract">提出无需训练的图像编辑框架，通过文本嵌入空间插值实现连续可控编辑。使用 LLM 自动构建对比提示对，计算导向向量控制生成。</div>
+                <span class="paper-tag tag-cv">🎨 图像编辑</span>
+                <span class="paper-tag tag-opt">✨ 无需训练</span>
+            </div>
+            
+            <div class="paper-card">
+                <div class="paper-title">CARE: Covariance-Aware and Rank-Enhanced Decomposition for Enabling Multi-Head Latent Attention</div>
+                <div class="paper-id">arXiv:2603.17946 · cs.LG</div>
+                <div class="paper-abstract">提出协方差感知、秩增强的 MLA 转换 pipeline。激活保持分解 + 调整秩分配 +KV 奇偶映射，在匹配 KV 预算下 perplexity 降低 215 倍。</div>
+                <span class="paper-tag tag-opt">🔧 注意力优化</span>
+                <span class="paper-tag tag-llm">💾 KV 缓存</span>
+            </div>
+            
+            <div class="paper-card">
+                <div class="paper-title">Efficient Training-Free Multi-Token Prediction via Embedding-Space Probing</div>
+                <div class="paper-id">arXiv:2603.17942 · cs.CL</div>
+                <div class="paper-abstract">通过嵌入空间探测实现无需训练的多 token 预测。构建推测 token 树并并行验证，LLaMA3 接受长度提升 12%，吞吐量提升 15-19%。</div>
+                <span class="paper-tag tag-llm">📈 推理加速</span>
+                <span class="paper-tag tag-opt">✨ 无需训练</span>
+            </div>
+            
+            <div class="paper-card">
+                <div class="paper-title">ShapleyLaw: A Game-Theoretic Approach to Multilingual Scaling Laws</div>
+                <div class="paper-id">arXiv:2603.17945 · cs.CL</div>
+                <div class="paper-abstract">将多语言预训练视为合作博弈，用 Shapley 值量化跨语言迁移效应。在模型性能预测和语言混合优化上优于基线方法。</div>
+                <span class="paper-tag tag-nlp">🌍 多语言</span>
+                <span class="paper-tag tag-llm">📊 缩放定律</span>
+            </div>
+            
+            <div class="paper-card">
+                <div class="paper-title">Universal Skeleton Understanding via Differentiable Rendering and MLLMs</div>
+                <div class="paper-id">arXiv:2603.18003 · cs.CV</div>
+                <div class="paper-abstract">提出 SkeletonLLM，通过可微分渲染器将任意骨架序列转换为 MLLM 原生视觉模态。在识别、描述、推理任务上展现强泛化能力。</div>
+                <span class="paper-tag tag-cv">🦴 骨架理解</span>
+                <span class="paper-tag tag-llm">🔗 多模态</span>
+            </div>
+            
+            <div class="paper-card">
+                <div class="paper-title">Unified Policy Value Decomposition for Rapid Adaptation</div>
+                <div class="paper-id">arXiv:2603.17947 · cs.LG</div>
+                <div class="paper-abstract">提出策略 - 值分解框架，共享低维目标嵌入向量实现快速适应。在 MuJoCo Ant 多方向运动任务上实现零样本适应新方向。</div>
+                <span class="paper-tag tag-rl">🎮 强化学习</span>
+                <span class="paper-tag tag-opt">⚡ 快速适应</span>
+            </div>
+            
+            <h2 class="section-title">📊 研究方向分布</h2>
+            <div class="distribution">
+                <div class="bar-chart">
+                    <div class="bar-item">
+                        <div class="bar-label">👁️ 视觉与多模态</div>
+                        <div class="bar-container"><div class="bar-fill" style="width: 35%; background: linear-gradient(90deg, #667eea, #764ba2);">35%</div></div>
+                    </div>
+                    <div class="bar-item">
+                        <div class="bar-label">🤖 Agent/RL</div>
+                        <div class="bar-container"><div class="bar-fill" style="width: 25%; background: linear-gradient(90deg, #11998e, #38ef7d);">25%</div></div>
+                    </div>
+                    <div class="bar-item">
+                        <div class="bar-label">⚡ 效率优化</div>
+                        <div class="bar-container"><div class="bar-fill" style="width: 25%; background: linear-gradient(90deg, #eb3349, #f45c43);">25%</div></div>
+                    </div>
+                    <div class="bar-item">
+                        <div class="bar-label">🌍 NLP/多语言</div>
+                        <div class="bar-container"><div class="bar-fill" style="width: 15%; background: linear-gradient(90deg, #f093fb, #f5576c);">15%</div></div>
+                    </div>
+                </div>
+            </div>
+            
+            <h2 class="section-title">🔮 核心趋势洞察</h2>
+            <div class="trend-grid">
+                <div class="trend-card">
+                    <div class="trend-icon">⚡</div>
+                    <h4>效率优先成为主流</h4>
+                    <p>STTS、MUD、CARE、多 token 预测——4 篇论文聚焦效率优化，训练/推理加速成为核心诉求</p>
+                </div>
+                <div class="trend-card">
+                    <div class="trend-icon">🔄</div>
+                    <h4>Agent 自进化突破</h4>
+                    <p>AgentFactory 将经验保存为可执行代码而非文本，实现能力持续积累和跨系统迁移</p>
+                </div>
+                <div class="trend-card">
+                    <div class="trend-icon">🌐</div>
+                    <h4>3D 空间理解深化</h4>
+                    <p>Loc3R-VLM、SkeletonLLM 将 VLM 扩展到 3D 和骨架模态，多模态边界持续拓展</p>
+                </div>
+                <div class="trend-card">
+                    <div class="trend-icon">✨</div>
+                    <h4>无需训练范式兴起</h4>
+                    <p>文本嵌入插值、嵌入空间探测——训练-free 方法达到接近训练方法的效果</p>
+                </div>
+            </div>
+            
+            <h2 class="section-title">💡 关键洞察</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>趋势</th>
+                        <th>信号</th>
+                        <th>代表论文</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>推理效率革命</strong></td>
+                        <td>token 修剪、优化器改进、多 token 预测</td>
+                        <td>STTS, MUD, MTP Probing</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Agent 工程化</strong></td>
+                        <td>从文本经验→可执行代码</td>
+                        <td>AgentFactory</td>
+                    </tr>
+                    <tr>
+                        <td><strong>模态融合深化</strong></td>
+                        <td>VLM 扩展到 3D、骨架、布局</td>
+                        <td>Loc3R-VLM, SkeletonLLM, EchoGen</td>
+                    </tr>
+                    <tr>
+                        <td><strong>轻量化成为标配</strong></td>
+                        <td>KV 缓存优化、无需训练方法</td>
+                        <td>CARE, Text Embedding Interpolation</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="footer">
+            <p>数据来源：arxiv.org · 更新日期：2026-03-20 · 分类：cs.AI, cs.LG, cs.CL, cs.CV</p>
+        </div>
+    </div>
+</body>
+</html>

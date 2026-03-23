@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 20px; }
+        .header h1 { margin: 0; font-size: 28px; }
+        .header p { margin: 10px 0 0; opacity: 0.9; }
+        .section { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 15px; }
+        .section h2 { color: #667eea; margin-top: 0; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        .weather-box { display: flex; justify-content: space-around; text-align: center; }
+        .weather-item { padding: 10px; }
+        .weather-icon { font-size: 48px; }
+        .paper-item, .news-item { background: white; padding: 15px; margin: 10px 0; border-radius: 6px; border-left: 4px solid #667eea; }
+        .paper-item h3, .news-item h3 { margin: 0 0 8px; font-size: 16px; color: #333; }
+        .paper-item a, .news-item a { color: #667eea; text-decoration: none; }
+        .paper-item a:hover, .news-item a:hover { text-decoration: underline; }
+        .meta { color: #888; font-size: 13px; margin-top: 8px; }
+        .summary { color: #555; font-size: 14px; }
+        .trend { background: #e8f4fd; padding: 15px; border-radius: 6px; }
+        .trend ul { margin: 10px 0; padding-left: 20px; }
+        .footer { text-align: center; color: #888; font-size: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌅 早安 · Morning Briefing</h1>
+        <p>2026-03-20 | Friday | 北京</p>
+    </div>
+    
+    <div class="section">
+        <h2>🌤️ 今日天气</h2>
+        <div class="weather-box">
+            <div class="weather-item">
+                <div class="weather-icon">🌧️</div>
+                <div><strong>N/A</strong></div>
+                <div>N/A°C / N/A°F</div>
+            </div>
+            <div class="weather-item">
+                <div class="weather-icon">🌡️</div>
+                <div>最高 N/A°C</div>
+                <div>最低 N/A°C</div>
+            </div>
+            <div class="weather-item">
+                <div class="weather-icon">💧</div>
+                <div>湿度 N/A%</div>
+                <div>N/A</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>📊 AI 论文速递 (arXiv)</h2>
+
+        <div class="paper-item">
+            <h3>1. <a href="https://arxiv.org/abs/2603.18892v1">MultihopSpatial: Multi-hop Compositional Spatial Reasoning Benchmark for Vision-Language Model</a></h3>
+            <div class="summary">Spatial reasoning is foundational for Vision-Language Models (VLMs), particularly when deployed as Vision-Language-Action (VLA) agents in physical environments. However, existing benchmarks predominan...</div>
+            <div class="meta">📅 2026-03-19</div>
+        </div>
+
+        <div class="paper-item">
+            <h3>2. <a href="https://arxiv.org/abs/2603.18886v1">Reasoning over mathematical objects: on-policy reward modeling and test time aggregation</a></h3>
+            <div class="summary">The ability to precisely derive mathematical objects is a core requirement for downstream STEM applications, including mathematics, physics, and chemistry, where reasoning must culminate in formally s...</div>
+            <div class="meta">📅 2026-03-19</div>
+        </div>
+
+        <div class="paper-item">
+            <h3>3. <a href="https://arxiv.org/abs/2603.18881v1">Geography According to ChatGPT -- How Generative AI Represents and Reasons about Geography</a></h3>
+            <div class="summary">Understanding how AI will represent and reason about geography should be a key concern for all of us, as the broader public increasingly interacts with spaces and places through these systems. Similar...</div>
+            <div class="meta">📅 2026-03-19</div>
+        </div>
+
+        <div class="paper-item">
+            <h3>4. <a href="https://arxiv.org/abs/2603.18873v1">Evaluating LLM-Generated Lessons from the Language Learning Students' Perspective: A Short Case Study on Duolingo</a></h3>
+            <div class="summary">Popular language learning applications such as Duolingo use large language models (LLMs) to generate lessons for its users. Most lessons focus on general real-world scenarios such as greetings, orderi...</div>
+            <div class="meta">📅 2026-03-19</div>
+        </div>
+
+        <div class="paper-item">
+            <h3>5. <a href="https://arxiv.org/abs/2603.18871v1">Bridging Network Fragmentation: A Semantic-Augmented DRL Framework for UAV-aided VANETs</a></h3>
+            <div class="summary">Vehicular Ad-hoc Networks (VANETs) are the digital cornerstone of autonomous driving, yet they suffer from severe network fragmentation in urban environments due to physical obstructions. Unmanned Aer...</div>
+            <div class="meta">📅 2026-03-19</div>
+        </div>
+
+    </div>
+    
+    <div class="section">
+        <h2>📰 科技新闻</h2>
+
+        <div class="news-item">
+            <h3>1. <a href="https://techcrunch.com/2026/03/19/amazon-acquires-rivr-maker-of-a-stair-climbing-delivery-robot/">Amazon acquires Rivr, maker of a stair-climbing delivery robot</a></h3>
+            <div class="meta">📅 Thu, 19 Ma</div>
+        </div>
+
+        <div class="news-item">
+            <h3>2. <a href="https://techcrunch.com/2026/03/19/jeff-bezos-reportedly-wants-100-billion-to-buy-and-transform-old-manufacturing-firms-with-ai/">Jeff Bezos reportedly wants $100 billion to buy and transform old manufacturing firms with AI</a></h3>
+            <div class="meta">📅 Thu, 19 Ma</div>
+        </div>
+
+        <div class="news-item">
+            <h3>3. <a href="https://techcrunch.com/2026/03/19/restaurant-dancing-robot-went-wild-hot-pot-cupertino-haidilao-agibot/">Employees had to restrain a dancing humanoid robot after it went wild at a California restaurant</a></h3>
+            <div class="meta">📅 Thu, 19 Ma</div>
+        </div>
+
+        <div class="news-item">
+            <h3>4. <a href="https://techcrunch.com/2026/03/19/polymarket-continues-its-partnership-spree-with-a-major-league-baseball-deal/">Polymarket continues its partnership spree with a Major League Baseball deal</a></h3>
+            <div class="meta">📅 Thu, 19 Ma</div>
+        </div>
+
+        <div class="news-item">
+            <h3>5. <a href="https://techcrunch.com/2026/03/19/online-bot-traffic-will-exceed-human-traffic-by-2027-cloudflare-ceo-says/">Online bot traffic will exceed human traffic by 2027, Cloudflare CEO says</a></h3>
+            <div class="meta">📅 Thu, 19 Ma</div>
+        </div>
+
+    </div>
+    
+    <div class="section trend">
+        <h2>🔮 今日趋势</h2>
+        <ul>
+            <li>多模态模型持续优化，推理效率提升</li>
+            <li>Agent 工程化加速，自主性增强</li>
+            <li>边缘 AI 部署方案成熟</li>
+            <li>AI 安全与对齐研究深化</li>
+        </ul>
+    </div>
+    
+    <div class="footer">
+        <p>Generated by AIE Morning Briefing Skill</p>
+        <p>🤖 Automated Daily Briefing for tangchengwen@163.com</p>
+    </div>
+</body>
+</html>

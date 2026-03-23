@@ -1,0 +1,13 @@
+{
+  "id": "a8914885-f82f-4b07-97e9-106be63fba85",
+  "name": "Qwen_deploy",
+  "source_type": "local",
+  "config": {
+    "path": "deploy_knowledge"
+  },
+  "enabled": true,
+  "priority": 5,
+  "sync_interval": 60,
+  "created_at": "2026-03-19T17:05:42.309483",
+  "last_sync": "2026-03-19T17:05:42.313497"
+}

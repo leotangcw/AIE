@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 今日 AI 论文速递 - 2026-03-16</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #667eea;
+            margin: 0;
+            font-size: 28px;
+        }
+        .header .date {
+            color: #666;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .paper-card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .paper-card:hover {
+            transform: translateX(5px);
+        }
+        .paper-title {
+            color: #2d3748;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        .paper-abstract {
+            color: #4a5568;
+            font-size: 14px;
+            line-height: 1.7;
+            margin-bottom: 10px;
+        }
+        .paper-tag {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .paper-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .paper-link:hover {
+            text-decoration: underline;
+        }
+        .section-title {
+            color: #2d3748;
+            font-size: 20px;
+            font-weight: 600;
+            margin: 30px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .summary-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+        .summary-box h3 {
+            margin-top: 0;
+            font-size: 18px;
+        }
+        .summary-box ul {
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+        .summary-box li {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+        .trend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .trend-item {
+            background: rgba(255,255,255,0.15);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        .trend-item .count {
+            font-size: 24px;
+            font-weight: bold;
+            display: block;
+        }
+        .trend-item .label {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            color: #666;
+            font-size: 13px;
+        }
+        .emoji {
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 今日 AI 论文速递</h1>
+            <div class="date">📅 2026-03-16 | arXiv 24 小时最新提交</div>
+        </div>
+
+        <div class="section-title">🔬 精选论文</div>
+
+        <div class="paper-card">
+            <div class="paper-title">1. Do Metrics for Counterfactual Explanations Align with User Perception?</div>
+            <div class="paper-abstract">解释性被广泛认为是可信 AI 系统的关键。然而，常用的反事实解释评估指标很少针对人类判断进行验证。本研究通过实证研究直接比较算法评估指标与人类判断，发现两者相关性普遍较弱且高度依赖数据集。结果表明，广泛使用的反事实评估指标无法反映用户感知的解释质量关键方面。</div>
+            <span class="paper-tag">可解释 AI</span>
+            <span class="paper-tag">人机交互</span>
+            <a href="https://arxiv.org/abs/2603.15607" class="paper-link" style="margin-left: 10px;">📄 查看全文 →</a>
+        </div>
+
+        <div class="paper-card">
+            <div class="paper-title">2. OpenSeeker: Democratizing Frontier Search Agents by Fully Open-Sourcing Training Data</div>
+            <div class="paper-abstract">深度搜索能力已成为前沿 LLM Agent 的关键能力，但高质量训练数据的缺乏使该领域发展被工业巨头主导。OpenSeeker 是首个完全开源的搜索 Agent（模型+数据），通过事实 grounding 的可控 QA 合成和去噪轨迹合成两项技术创新，仅用 11.7k 合成样本就在多个基准上达到 SOTA 性能，甚至超越工业级竞品。</div>
+            <span class="paper-tag">AI Agent</span>
+            <span class="paper-tag">开源</span>
+            <a href="https://arxiv.org/abs/2603.15594" class="paper-link" style="margin-left: 10px;">📄 查看全文 →</a>
+        </div>
+
+        <div class="paper-card">
+            <div class="paper-title">3. Computational Concept of the Psyche</div>
+            <div class="paper-abstract">本文提出了一种认知架构概念，将心理视为生物或人工主体的操作系统，包括需求状态空间和智能决策系统。基于此概念，提出了通过体验学习在状态空间中创建 AGI 系统的计算形式化方法，将 AGI 构建问题形式化为在不确定条件下最大化目标成功、最小化存在风险并最大化能量效率的最优决策系统。</div>
+            <span class="paper-tag">AGI</span>
+            <span class="paper-tag">认知架构</span>
+            <a href="https://arxiv.org/abs/2603.15586" class="paper-link" style="margin-left: 10px;">📄 查看全文 →</a>
+        </div>
+
+        <div class="paper-card">
+            <div class="paper-title">4. Are Dilemmas and Conflicts in LLM Alignment Solvable? A View from Priority Graph</div>
+            <div class="paper-abstract">随着 LLM 变得更强大和自主，它们在许多场景中面临冲突和困境。本文首先对这些冲突进行分类，然后将 LLM 的偏好建模为优先级图。研究发现统一的稳定 LLM 对齐非常具有挑战性，因为图既不是静态的也不必然一致。还揭示了"优先级黑客"的潜在漏洞，并提出运行时验证机制来增强鲁棒性。</div>
+            <span class="paper-tag">LLM 对齐</span>
+            <span class="paper-tag">AI 安全</span>
+            <a href="https://arxiv.org/abs/2603.15527" class="paper-link" style="margin-left: 10px;">📄 查看全文 →</a>
+        </div>
+
+        <div class="paper-card">
+            <div class="paper-title">5. Understanding Reasoning in LLMs through Strategic Information Allocation under Uncertainty</div>
+            <div class="paper-abstract">LLM 在推理过程中常表现出"Aha 时刻"，如"Wait"后的自我纠正，但其底层机制尚不清楚。本文引入信息论框架，将推理分解为程序性信息和认知言语化（不确定性的显式外部化）。研究表明，强推理性能由不确定性外部化驱动，而非特定表面 token。该框架统一了 prior 发现并为未来推理模型设计提供见解。</div>
+            <span class="paper-tag">LLM 推理</span>
+            <span class="paper-tag">信息论</span>
+            <a href="https://arxiv.org/abs/2603.15500" class="paper-link" style="margin-left: 10px;">📄 查看全文 →</a>
+        </div>
+
+        <div class="paper-card">
+            <div class="paper-title">6. Talk, Evaluate, Diagnose: User-aware Agent Evaluation with Automated Error Analysis</div>
+            <div class="paper-abstract">Agent 应用日益普及，但由于领域异构性，创建可扩展的评估框架具有挑战性。本文提出 TED 框架：(1) Talk：利用可复用的专家/非专家用户 persona 模板；(2) Evaluate：将子目标表示为自然语言评分说明，用 LLM-as-a-judge 自动评估；(3) Diagnose：引入自动化错误分析工具。实验表明该框架能揭示新的性能洞察， Incorporating 错误修复后可提升 8-10% 性能。</div>
+            <span class="paper-tag">Agent 评估</span>
+            <span class="paper-tag">自动化测试</span>
+            <a href="https://arxiv.org/abs/2603.15483" class="paper-link" style="margin-left: 10px;">📄 查看全文 →</a>
+        </div>
+
+        <div class="paper-card">
+            <div class="paper-title">7. Agent Lifecycle Toolkit (ALTK): Reusable Middleware Components for Robust AI Agents</div>
+            <div class="paper-abstract">随着 AI Agent 从演示走向企业部署，其失败模式变得后果严重。大多数 Agent 框架让开发者临时处理这些失败模式，导致脆弱的一次性防护。本文提出 ALTK，一个开源的模块化中间件组件集合，系统性地解决 Agent 全生命周期的 gaps，包括用户请求后、LLM 提示前、LLM 输出后、工具验证前等六个干预点。</div>
+            <span class="paper-tag">Agent 工程</span>
+            <span class="paper-tag">中间件</span>
+            <a href="https://arxiv.org/abs/2603.15473" class="paper-link" style="margin-left: 10px;">📄 查看全文 →</a>
+        </div>
+
+        <div class="paper-card">
+            <div class="paper-title">8. Unlocking the Value of Text: Event-Driven Reasoning and Multi-Level Alignment for Time Series Forecasting</div>
+            <div class="paper-abstract">现有时间序列预测方法主要依赖数值数据，但现实世界时间序列与多模态信息相关联。本文提出 VoT 方法，结合事件驱动推理和多级对齐。事件驱动推理将外源文本的丰富信息与 LLM 的强大推理能力结合；多级对齐在表示层整合内源文本信息，在预测层融合事件驱动预测和数值预测的频率成分。在 10 个领域的真实数据集上显著优于现有方法。</div>
+            <span class="paper-tag">时间序列</span>
+            <span class="paper-tag">多模态</span>
+            <a href="https://arxiv.org/abs/2603.15452" class="paper-link" style="margin-left: 10px;">📄 查看全文 →</a>
+        </div>
+
+        <div class="paper-card">
+            <div class="paper-title">9. Listening to the Echo: User-Reaction Aware Policy Optimization via Scalar-Verbal Hybrid Reinforcement Learning</div>
+            <div class="paper-abstract">当前情感支持对话系统通常依赖专家定义的标量奖励进行对齐，但这些信号存在严重的信息稀疏性。本文提出 RAPO 框架，通过交互后果而非评分标准进行优化。RAPO 将对话视为反应驱动过程，利用模拟用户响应通过三个核心组件生成密集的自然语言反馈：事后对话选择、生成式事后反馈、标量 - 言语混合策略优化。在 ESC 和 Sotopia 上显著优于强 RL 基线。</div>
+            <span class="paper-tag">情感对话</span>
+            <span class="paper-tag">强化学习</span>
+            <a href="https://arxiv.org/abs/2603.15434" class="paper-link" style="margin-left: 10px;">📄 查看全文 →</a>
+        </div>
+
+        <div class="paper-card">
+            <div class="paper-title">10. Why AI systems don't learn and what to do about it: Lessons on autonomous learning from cognitive science</div>
+            <div class="paper-abstract">本文批判性审视当前 AI 模型在实现自主学习方面的局限性，并提出受人类和动物认知启发的学习架构。 proposed 框架整合了观察学习（系统 A）和主动行为学习（系统 B），同时根据内部生成的元控制信号（系统 M）灵活切换学习模式。讨论了如何通过借鉴生物体在进化和发育时间尺度上适应真实动态环境的方式来构建这一架构。</div>
+            <span class="paper-tag">自主学习</span>
+            <span class="paper-tag">认知科学</span>
+            <a href="https://arxiv.org/abs/2603.15381" class="paper-link" style="margin-left: 10px;">📄 查看全文 →</a>
+        </div>
+
+        <div class="summary-box">
+            <h3>📈 研究方向总结</h3>
+            <div class="trend-grid">
+                <div class="trend-item">
+                    <span class="count">🤖 3</span>
+                    <span class="label">AI Agent 系统</span>
+                </div>
+                <div class="trend-item">
+                    <span class="count">🧠 2</span>
+                    <span class="label">LLM 推理与对齐</span>
+                </div>
+                <div class="trend-item">
+                    <span class="count">🔍 2</span>
+                    <span class="label">可解释性与评估</span>
+                </div>
+                <div class="trend-item">
+                    <span class="count">🧬 2</span>
+                    <span class="label">AGI 与认知架构</span>
+                </div>
+                <div class="trend-item">
+                    <span class="count">📊 1</span>
+                    <span class="label">多模态时间序列</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">🎯 核心趋势洞察</div>
+        <div style="background: #f0f4ff; border-radius: 12px; padding: 20px; margin-top: 15px;">
+            <ol style="margin: 0; padding-left: 20px; color: #4a5568; line-height: 1.8;">
+                <li><strong>Agent 工程化加速</strong>：从 OpenSeeker 的开源数据到 ALTK 的中间件工具，AI Agent 正从研究demo走向生产部署，可靠性和可复用性成为核心关注点。</li>
+                <li><strong>人类对齐深度探索</strong>：LLM 对齐研究从简单的 RLHF 转向更复杂的优先级图分析和运行时验证，承认某些伦理困境在哲学上不可简化。</li>
+                <li><strong>认知科学启发 AGI</strong>：多篇论文从人类认知、心理建模角度探索 AGI 架构，强调需求驱动、元控制和体验学习的重要性。</li>
+                <li><strong>评估范式革新</strong>：从纯算法指标转向人机协同评估，TED 框架和反事实解释的用户感知研究都强调"以人为中心"的评估理念。</li>
+                <li><strong>多模态融合深化</strong>：时间序列预测结合文本事件推理，情感对话结合用户反应反馈，跨模态信息融合成为提升性能的关键路径。</li>
+            </ol>
+        </div>
+
+        <div class="footer">
+            <p>📧 本邮件由 AI 自动生成 | 数据来源：arXiv.org</p>
+            <p>🔄 每日更新 | 如有疑问请联系 leotangbot@163.com</p>
+        </div>
+    </div>
+</body>
+</html>
