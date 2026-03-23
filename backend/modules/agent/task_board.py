@@ -200,7 +200,7 @@ class TaskBoardService:
             .where(TaskItem.session_id == session_id)
             .order_by(TaskItem.created_at.desc())
         )
-        tasks = result.scalars().all()
+        tasks = list(result.scalars().all())
 
         if include_subtasks:
             return tasks
@@ -215,7 +215,8 @@ class TaskBoardService:
             .where(TaskItem.status == TaskStatus.RUNNING.value)
             .order_by(TaskItem.started_at.asc())
         )
-        return result.scalars().all()
+        tasks = result.scalars().all()
+        return list(tasks) if tasks else []
 
     async def get_system_tasks(self) -> list[TaskItem]:
         """获取所有系统级任务"""
@@ -224,7 +225,8 @@ class TaskBoardService:
             .where(TaskItem.task_scope == TaskScope.SYSTEM.value)
             .order_by(TaskItem.next_run_at.asc().nullslast())
         )
-        return result.scalars().all()
+        tasks = result.scalars().all()
+        return list(tasks) if tasks else []
 
     async def get_child_tasks(self, parent_id: str) -> list[TaskItem]:
         """获取子任务"""
@@ -233,7 +235,8 @@ class TaskBoardService:
             .where(TaskItem.parent_id == parent_id)
             .order_by(TaskItem.created_at.asc())
         )
-        return result.scalars().all()
+        tasks = result.scalars().all()
+        return list(tasks) if tasks else []
 
     async def get_parent_tasks(self, session_id: str) -> list[TaskItem]:
         """获取会话的顶级任务"""
@@ -243,7 +246,8 @@ class TaskBoardService:
             .where(TaskItem.parent_id.is_(None))
             .order_by(TaskItem.created_at.desc())
         )
-        return result.scalars().all()
+        tasks = result.scalars().all()
+        return list(tasks) if tasks else []
 
     # =========================================================================
     # 私有方法

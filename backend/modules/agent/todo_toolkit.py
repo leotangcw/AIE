@@ -134,9 +134,10 @@ class TodoToolkit:
         self._lock = threading.Lock()
 
     async def _get_db(self):
-        """获取数据库会话"""
-        if self._db is not None:
-            return self._db
+        """获取数据库会话
+
+        每次调用都创建新的 session，因为 session 不能跨 async with 块使用
+        """
         return AsyncSessionLocal()
 
     async def _get_task_board(self, db) -> TaskBoardService:
@@ -166,6 +167,8 @@ class TodoToolkit:
 
         Todo 任务通过 parent_id 关联到主 todo list
         主 todo list 没有 parent_id
+
+        此方法创建自己的 db 上下文
         """
         db = await self._get_db()
         async with db:
@@ -194,7 +197,10 @@ class TodoToolkit:
             return children
 
     async def _get_todo_list_parent(self) -> Optional[TaskItem]:
-        """获取当前会话的 Todo List 父任务"""
+        """获取当前会话的 Todo List 父任务
+
+        此方法创建自己的 db 上下文
+        """
         db = await self._get_db()
         async with db:
             task_board = await self._get_task_board(db)
@@ -258,9 +264,11 @@ class TodoToolkit:
         async with db:
             task_board = await self._get_task_board(db)
 
-            # 检查是否已存在 todo list
-            existing = await self._get_todo_list_parent()
-            if existing:
+            # 检查是否已存在 todo list（复用当前 db 上下文，不创建新的）
+            existing = await task_board.get_parent_tasks(self.session_id)
+            todo_lists = [t for t in existing if TODO_LIST_DESCRIPTION in (t.description or "")]
+            if todo_lists:
+                existing = todo_lists[0]
                 # 检查是否有子任务
                 children = await task_board.get_child_tasks(existing.id)
                 if children:
@@ -294,8 +302,11 @@ class TodoToolkit:
             task_board.db.expire_all()  # 同步方法
             all_tasks = await task_board.get_child_tasks(parent_task.id)
 
-            # 广播更新
-            await self._emit_todo_updated(all_tasks)
+            # 广播更新（使用 try-except 确保即使出现 greenlet 错误也能记录）
+            try:
+                await self._emit_todo_updated(all_tasks)
+            except Exception as e:
+                logger.warning(f"[TodoToolkit] Failed to emit todo.updated in todo_create: {e}")
 
             return f"已创建 {len(tasks)} 个待办任务"
 
@@ -369,21 +380,29 @@ class TodoToolkit:
                     parent = None
 
             if not parent:
-                # 如果没有 todo list，直接创建
-                return await self.todo_create(tasks)
+                # 如果没有 todo list，先创建父任务（不调用 todo_create 避免嵌套 db 上下文）
+                parent = await task_board.create_session_task(
+                    title="Todo List",
+                    task_type="todo",
+                    session_id=self.session_id,
+                    description=TODO_LIST_DESCRIPTION,
+                )
+                await task_board.db.commit()
 
             # 获取现有子任务（强制刷新确保拿到最新数据）
             task_board.db.expire_all()
             existing_tasks = await task_board.get_child_tasks(parent.id)
 
-            # 解析现有任务的编号
+            # 解析现有任务的编号，并收集已有描述用于去重
             task_map = {}
+            existing_descriptions = set()
             for t in existing_tasks:
                 parts = t.title.split(". ", 1)
                 if len(parts) == 2:
                     try:
                         num = int(parts[0])
                         task_map[num] = t
+                        existing_descriptions.add(parts[1].strip())
                     except ValueError:
                         pass
 
@@ -395,24 +414,41 @@ class TodoToolkit:
             else:
                 insert_pos = idx
 
-            # 插入新任务
+            # 过滤掉已存在的任务（去重）
+            new_tasks_to_insert = []
+            for task_desc in tasks:
+                desc = task_desc.strip()
+                if desc not in existing_descriptions:
+                    new_tasks_to_insert.append(task_desc)
+                    existing_descriptions.add(desc)  # 防止同一批次内重复
+
+            if not new_tasks_to_insert:
+                # 所有任务都已存在
+                task_board.db.expire_all()
+                all_tasks = await task_board.get_child_tasks(parent.id)
+                all_tasks.sort(key=lambda t: int(t.title.split(".")[0]) if "." in t.title and t.title[0].isdigit() else 0)
+                await self._emit_todo_updated(all_tasks)
+                return f"所有任务已存在，无需重复创建"
+
+            # 插入新任务（只插入不重复的）
             inserted = []
-            for i, task_desc in enumerate(tasks):
-                new_idx = insert_pos + i
+            current_idx = insert_pos
+            for task_desc in new_tasks_to_insert:
                 task = await task_board.create_session_task(
-                    title=f"{new_idx}. {task_desc[:100]}",
+                    title=f"{current_idx}. {task_desc[:100]}",
                     task_type="todo",
                     session_id=self.session_id,
                     description=task_desc,
                     parent_id=parent.id,
                 )
                 inserted.append(task)
+                current_idx += 1
 
             # 重新编号插入位置之后的任务
             for num in sorted(task_map.keys()):
                 if num >= insert_pos:
                     old_task = task_map[num]
-                    new_num = num + len(tasks)
+                    new_num = num + len(new_tasks_to_insert)
                     old_task.title = f"{new_num}. {old_task.title.split('. ', 1)[1]}"
 
             # 统一提交所有更改
@@ -421,12 +457,14 @@ class TodoToolkit:
             # 重新加载所有任务 - 清除缓存确保拿到最新数据
             task_board.db.expire_all()  # 同步方法
             all_tasks = await task_board.get_child_tasks(parent.id)
-            all_tasks.sort(key=lambda t: int(t.title.split(".")[0]) if "." in t.title else 0)
+            all_tasks.sort(key=lambda t: int(t.title.split(".")[0]) if "." in t.title and t.title[0].isdigit() else 0)
 
             # 广播更新
             await self._emit_todo_updated(all_tasks)
 
-            return f"已插入 {len(tasks)} 个任务到位置 {insert_pos}"
+            if len(new_tasks_to_insert) < len(tasks):
+                return f"已插入 {len(new_tasks_to_insert)} 个新任务（{len(tasks) - len(new_tasks_to_insert)} 个重复任务已跳过）到位置 {insert_pos}"
+            return f"已插入 {len(new_tasks_to_insert)} 个任务到位置 {insert_pos}"
 
     async def todo_remove(self, idx: int) -> str:
         """删除任务（通过索引）
