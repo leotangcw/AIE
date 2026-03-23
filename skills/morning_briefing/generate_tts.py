@@ -84,7 +84,7 @@ def get_tech_news():
                 'link': entry.link,
             })
         return news
-    except:
+    except Exception:
         return []
 
 

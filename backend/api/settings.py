@@ -235,12 +235,16 @@ async def get_settings() -> SettingsResponse:
     try:
         config = config_loader.config
         
-        # 构建 providers 响应（不脱敏，直接返回）
+        # 构建 providers 响应（API key 脱敏）
         providers_response = {}
         for name, provider_config in config.providers.items():
+            # 脱敏 API key：只显示最后 4 位
+            masked_key = None
+            if provider_config.api_key:
+                masked_key = "*" * (len(provider_config.api_key) - 4) + provider_config.api_key[-4:]
             providers_response[name] = ProviderConfigResponse(
                 enabled=provider_config.enabled,
-                api_key=provider_config.api_key,  # 直接返回，不脱敏
+                api_key=masked_key,
                 api_base=provider_config.api_base,
             )
         

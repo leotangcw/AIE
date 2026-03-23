@@ -29,11 +29,13 @@ AI_CATEGORIES = [
 ]
 
 # Email configuration
-SMTP_SERVER = "smtp.163.com"
-SMTP_PORT = 465
-SENDER_EMAIL = "leotangbot@163.com"
-SENDER_PASSWORD = "SWdqGSFtw34fRnie"
-RECEIVER_EMAIL = "tangchengwen@163.com"
+import os
+
+SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.163.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "")
+SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD", "")
+RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL", "")
 
 def fetch_arxiv_papers(max_papers=50):
     """Fetch recent AI papers from arxiv API, sorted by submission date"""

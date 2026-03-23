@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from loguru import logger
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -33,19 +34,6 @@ sync_engine = create_engine(
     SYNC_DATABASE_URL,
     echo=False,
     future=True,
-)
-
-# 会话工厂
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
-# 同步会话工厂
-SessionLocal = sessionmaker(
-    sync_engine,
-    expire_on_commit=False,
 )
 
 # 会话工厂
@@ -151,7 +139,6 @@ async def init_personalities() -> None:
             
             await session.commit()
             
-        except Exception:
+        except Exception as e:
             await session.rollback()
-            # 静默失败，不影响数据库初始化
-            pass
+            logger.warning(f"Failed to initialize personalities: {e}")

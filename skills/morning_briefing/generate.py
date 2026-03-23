@@ -94,7 +94,7 @@ def get_tech_news():
                     'published': entry.published[:10] if 'published' in entry else 'N/A',
                 }
                 news_list.append(news)
-        except:
+        except Exception:
             continue
     
     return news_list[:5]
