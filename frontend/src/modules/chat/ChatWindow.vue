@@ -224,6 +224,7 @@
           <button
             v-if="!isStreaming"
             class="action-btn voice-btn"
+            :class="{ recording: isRecording }"
             title="语音输入"
             @click="toggleVoiceInput"
           >
@@ -1471,15 +1472,94 @@ const handleFileInputChange = (event: Event) => {
 }
 
 // 语音输入切换
-const toggleVoiceInput = () => {
+let mediaRecorder: MediaRecorder | null = null
+let audioChunks: Blob[] = []
+
+const toggleVoiceInput = async () => {
   if (isRecording.value) {
     // 停止录音
-    isRecording.value = false
-    toast.info('语音录制已停止（功能开发中）')
+    stopRecording()
   } else {
     // 开始录音
+    await startRecording()
+  }
+}
+
+const startRecording = async () => {
+  try {
+    // 请求麦克风权限
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+
+    // 创建 MediaRecorder
+    mediaRecorder = new MediaRecorder(stream, {
+      mimeType: 'audio/webm;codecs=opus'
+    })
+    audioChunks = []
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data)
+      }
+    }
+
+    mediaRecorder.onstop = async () => {
+      // 停止所有轨道
+      stream.getTracks().forEach(track => track.stop())
+
+      // 生成音频文件
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
+
+      // 转录
+      await transcribeAudio(audioBlob)
+    }
+
+    mediaRecorder.start(1000) // 每秒分割数据块
     isRecording.value = true
-    toast.info('语音录制已开始（功能开发中）')
+    toast.success('开始录音')
+  } catch (error) {
+    console.error('[ChatWindow] 录音失败:', error)
+    toast.error('无法访问麦克风，请检查权限设置')
+  }
+}
+
+const stopRecording = () => {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+    isRecording.value = false
+  }
+}
+
+const transcribeAudio = async (audioBlob: Blob) => {
+  try {
+    toast.info('正在识别语音...')
+
+    const formData = new FormData()
+    formData.append('file', audioBlob, 'recording.webm')
+
+    const response = await fetch('/api/audio/transcribe', {
+      method: 'POST',
+      body: formData
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || '转录失败')
+    }
+
+    const result = await response.json()
+
+    if (result.text) {
+      // 将识别出的文本填入输入框
+      inputMessage.value = inputMessage.value
+        ? `${inputMessage.value} ${result.text}`
+        : result.text
+      toast.success('语音已识别')
+    } else {
+      toast.warning('未识别到语音内容')
+    }
+  } catch (error) {
+    console.error('[ChatWindow] 语音转文字失败:', error)
+    toast.error(error instanceof Error ? error.message : '语音识别失败')
   }
 }
 
@@ -2510,6 +2590,25 @@ onBeforeUnmount(() => {
 .voice-btn:hover {
   background: var(--hover-bg, #f3f4f6);
   color: var(--text-secondary, #6b7280);
+}
+
+.voice-btn.recording {
+  color: #ef4444;
+  animation: pulse-recording 1.5s ease-in-out infinite;
+}
+
+.voice-btn.recording:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+@keyframes pulse-recording {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* 发送按钮 */
