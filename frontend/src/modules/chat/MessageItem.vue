@@ -66,8 +66,8 @@
         v-html="replayContent !== null ? replayContent : renderedContent"
       />
       <ImageGallery
-        v-if="message.role === 'assistant' && message.images && message.images.length > 0"
-        :images="message.images"
+        v-if="message.images && message.images.length > 0"
+        :images="numberedImages"
       />
       <div class="audio-players" v-if="message.role === 'assistant' && message.audio && message.audio.length > 0">
         <AudioPlayer
@@ -224,6 +224,15 @@ const renderedContent = computed(() => {
     return renderMarkdown(props.message.content)
   }
   return props.message.content
+})
+
+// 为图片添加编号标签，方便用户识别"图片 1"、"图片 2"等
+const numberedImages = computed(() => {
+  if (!props.message.images) return []
+  return props.message.images.map((img, index) => ({
+    ...img,
+    alt: `图片 ${index + 1}${img.alt ? ': ' + img.alt : ''}`
+  }))
 })
 
 const visibleToolCalls = computed(() => {
