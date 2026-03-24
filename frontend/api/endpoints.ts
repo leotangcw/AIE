@@ -600,3 +600,34 @@ export const stopAPI = {
     getActiveTasks: (): Promise<{ active_tasks: string[]; count: number }> =>
         queueAPI.getActiveTasks(),
 }
+
+// Upload API
+export interface UploadResponse {
+    success: boolean
+    path: string
+    filename: string
+    size: number
+    type: string
+}
+
+export const uploadAPI = {
+    uploadFile: async (file: File): Promise<UploadResponse> => {
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const response = await fetch('/api/upload/file', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                // Don't set Content-Type for FormData, let browser set it with boundary
+            },
+        })
+
+        if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.detail || 'Upload failed')
+        }
+
+        return response.json()
+    },
+}

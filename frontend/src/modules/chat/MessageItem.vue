@@ -59,12 +59,24 @@
 
       <!-- 消息内容 -->
       <!-- eslint-disable-next-line vue/no-v-html -->
-      <div 
+      <div
         v-else-if="message.role === 'assistant' && message.content && (!isReplaying || replayContent !== null)"
         class="message-content markdown-content"
         :class="{ 'typewriter-active': isReplaying }"
         v-html="replayContent !== null ? replayContent : renderedContent"
       />
+      <ImageGallery
+        v-if="message.role === 'assistant' && message.images && message.images.length > 0"
+        :images="message.images"
+      />
+      <div class="audio-players" v-if="message.role === 'assistant' && message.audio && message.audio.length > 0">
+        <AudioPlayer
+          v-for="(audioItem, index) in message.audio"
+          :key="index"
+          :src="audioItem.src"
+          :name="audioItem.name || `Audio ${index + 1}`"
+        />
+      </div>
       <div 
         v-else-if="message.role !== 'assistant' && message.content"
         class="message-content user-message-content"
@@ -146,6 +158,8 @@ import { useI18n } from 'vue-i18n'
 import { useToast } from '@/composables/useToast'
 import ToolCallCard from '@/components/chat/ToolCallCard.vue'
 import ReasoningBlock from '@/components/chat/ReasoningBlock.vue'
+import ImageGallery from '@/components/chat/ImageGallery.vue'
+import AudioPlayer from '@/components/chat/AudioPlayer.vue'
 
 interface ToolCall {
   id: string
@@ -164,6 +178,15 @@ interface Message {
   toolCalls?: ToolCall[]
   reasoningContent?: string
   isThinking?: boolean
+  images?: Array<{
+    src: string
+    alt?: string
+    caption?: string
+  }>
+  audio?: Array<{
+    src: string
+    name?: string
+  }>
 }
 
 interface Props {
@@ -524,6 +547,13 @@ onBeforeUnmount(() => {
 .message-user .message-content {
   background: #ffffff;
   border: 1px solid #e2e8f0;
+}
+
+.audio-players {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--spacing-sm) 0;
 }
 
 .user-message-content {

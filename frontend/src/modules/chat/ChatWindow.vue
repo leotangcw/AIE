@@ -220,6 +220,40 @@
           @keydown.meta.enter.prevent="sendMessage"
         />
         <div class="input-actions">
+          <!-- 语音按钮 -->
+          <button
+            v-if="!isStreaming"
+            class="action-btn voice-btn"
+            title="语音输入"
+            @click="toggleVoiceInput"
+          >
+            <component
+              :is="isRecording ? StopCircleIcon : MicIcon"
+              :size="18"
+            />
+          </button>
+          <!-- 文件按钮 -->
+          <button
+            v-if="!isStreaming"
+            class="action-btn attach-btn"
+            :class="{ 'has-items': selectedFiles.length > 0 }"
+            :title="selectedFiles.length > 0 ? `${selectedFiles.length} 个附件` : '添加附件'"
+            @click="triggerFileInput"
+          >
+            <component
+              :is="selectedFiles.length > 0 ? PaperclipIcon : PlusIcon"
+              :size="18"
+            />
+            <span v-if="selectedFiles.length > 0" class="action-badge">{{ selectedFiles.length }}</span>
+          </button>
+          <input
+            ref="fileInputRef"
+            type="file"
+            :accept="fileAcceptTypes"
+            multiple
+            class="hidden-file-input"
+            @change="handleFileInputChange"
+          />
           <button
             v-if="isStreaming"
             class="stop-generation-btn"
@@ -392,11 +426,17 @@ import {
   List as ListIcon,
   ListTodo as ListTodoIcon,
   BookOpen as BookOpenIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  Image as ImageIcon,
+  CheckCircle as CheckCircleIcon,
+  Paperclip as PaperclipIcon,
+  Plus as PlusIcon,
+  Mic as MicIcon,
+  StopCircle as StopCircleIcon
 } from 'lucide-vue-next'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import LanguageSelector from '@/components/ui/LanguageSelector.vue'
-import { LoadingState, EmptyState, FileSelector, FilePreviewModal } from '@/components/ui'
+import { LoadingState, EmptyState, FilePreviewModal } from '@/components/ui'
 import MessageItem from './MessageItem.vue'
 import MessageList from './MessageList.vue'
 import SessionPanel from './SessionPanel.vue'
@@ -704,6 +744,8 @@ function connectWebSocket(sessionId: string) {
             if (index !== -1) {
               messages.value[index].isThinking = false
               messages.value[index].content = message.content || ''
+              messages.value[index].images = message.images || []
+              messages.value[index].audio = message.audio || []
               currentStreamingMessage = messages.value[index]
             }
           } else {
@@ -713,7 +755,9 @@ function connectWebSocket(sessionId: string) {
               role: 'assistant',
               content: message.content || '',
               timestamp: new Date(),
-              toolCalls: []
+              toolCalls: [],
+              images: message.images || [],
+              audio: message.audio || []
             }
             messages.value.push(newMessage)
             currentStreamingMessage = newMessage
@@ -1117,7 +1161,7 @@ const inputMessage = ref('')
 const textareaRef = ref<HTMLTextAreaElement>()
 const messageListRef = ref<InstanceType<typeof MessageList>>()
 const panelRef = ref<HTMLElement>()
-const fileSelectorRef = ref<InstanceType<typeof FileSelector>>()
+const fileInputRef = ref<HTMLInputElement>()
 const activePanel = ref<PanelType>(null)
 const selectedFiles = ref<File[]>([])
 const showSystemSidebar = ref(false)
@@ -1126,6 +1170,7 @@ const showTaskBoard = ref(true) // 左侧任务看板默认显示
 const activeMessageId = ref<string | null>(null)
 const isDraggingOver = ref(false)
 const isInputFocused = ref(false)
+const isRecording = ref(false) // 语音录制状态
 const dragCounter = ref(0)
 const showPreviewModal = ref(false)
 const previewFile = ref<File | null>(null)
@@ -1137,11 +1182,14 @@ const minPanelWidth = 380 // 最小宽度
 const maxPanelWidth = 1200 // 最大宽度
 
 const canSend = computed(() => {
-  return inputMessage.value.trim() && 
+  return inputMessage.value.trim() &&
          isConnected.value &&
          ws !== null &&
          ws.readyState === WebSocket.OPEN
 })
+
+// 支持的图片、音频、视频文件类型
+const fileAcceptTypes = 'image/*,audio/*,video/*,.pdf,.doc,.docx,.txt'
 
 const headerActions = computed(() => [
   { id: 'sessions', icon: HistoryIcon, label: 'nav.sessions', tooltip: 'nav.sessionsTooltip', onClick: () => showPanel('sessions') },
@@ -1157,7 +1205,7 @@ const headerActions = computed(() => [
   { id: 'settings', icon: SettingsIcon, label: 'settings.title', tooltip: 'nav.settingsTooltip', onClick: () => showPanel('settings') }
 ])
 
-const sendMessage = () => {
+const sendMessage = async () => {
   if (!ws || ws.readyState !== WebSocket.OPEN || !isConnected.value) {
     // 自动重连而非要求手动刷新
     const message = inputMessage.value.trim()
@@ -1208,16 +1256,10 @@ const sendMessage = () => {
   
   const message = inputMessage.value.trim()
   if (!message) return
-  
+
   inputMessage.value = ''
   if (textareaRef.value) {
     textareaRef.value.style.height = 'auto'
-  }
-
-  // 清除文件
-  if (selectedFiles.value.length > 0) {
-    fileSelectorRef.value?.clearFiles()
-    selectedFiles.value = []
   }
 
   // 如果正在流式传输，将消息加入队列
@@ -1238,8 +1280,8 @@ const sendMessage = () => {
     return
   }
 
-  // 直接发送
-  doSendMessage(message)
+  // 直接发送（带附件）
+  await doSendMessage(message)
 }
 
 // 清空当前对话
@@ -1271,13 +1313,13 @@ async function clearCurrentChat() {
 }
 
 // 发送排队的消息
-function sendQueuedMessage(message: string) {
+async function sendQueuedMessage(message: string) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return
-  doSendMessage(message)
+  await doSendMessage(message)
 }
 
 // 实际发送消息
-function doSendMessage(message: string) {
+async function doSendMessage(message: string) {
   // 添加用户消息（如果还没添加过，即非排队消息）
   const existingQueued = messages.value.find(
     m => m.role === 'user' && m.content === message && m.queued
@@ -1294,12 +1336,40 @@ function doSendMessage(message: string) {
     })
   }
 
-  const payload = {
+  // 先上传附件，获取路径
+  let attachments: string[] = []
+  if (selectedFiles.value.length > 0) {
+    try {
+      for (const file of selectedFiles.value) {
+        const formData = new FormData()
+        formData.append('file', file)
+        const response = await fetch('/api/upload/file', {
+          method: 'POST',
+          body: formData
+        })
+        if (response.ok) {
+          const result = await response.json()
+          if (result.path) {
+            attachments.push(result.path)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[ChatWindow] 文件上传失败:', error)
+    }
+    // 清空文件选择
+    selectedFiles.value = []
+  }
+
+  const payload: Record<string, any> = {
     type: 'message',
     sessionId: chatStore.currentSessionId,
     content: message
   }
-  
+  if (attachments.length > 0) {
+    payload.attachments = attachments
+  }
+
   try {
     ws!.send(JSON.stringify(payload))
     isStreaming.value = true
@@ -1369,8 +1439,48 @@ const stopGeneration = async () => {
   }
 }
 
-const handleFilesChange = (files: File[]) => {
-  selectedFiles.value = files
+// 触发文件选择
+const triggerFileInput = () => {
+  fileInputRef.value?.click()
+}
+
+// 处理文件输入变化
+const handleFileInputChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const files = Array.from(target.files || [])
+  if (files.length === 0) return
+
+  // 验证文件
+  const maxSize = 10 * 1024 * 1024 // 10MB
+  const maxFiles = 20 // 宽松限制，具体取决于模型能力
+  const invalidFiles = files.filter(file => file.size > maxSize)
+
+  if (invalidFiles.length > 0) {
+    toast.error(`文件过大: ${invalidFiles[0].name} (最大 10MB)`)
+    return
+  }
+
+  const totalFiles = selectedFiles.value.length + files.length
+  if (totalFiles > maxFiles) {
+    toast.error(`最多支持 ${maxFiles} 个文件（当前模型建议值）`)
+    return
+  }
+
+  selectedFiles.value.push(...files)
+  target.value = '' // 重置以允许选择相同文件
+}
+
+// 语音输入切换
+const toggleVoiceInput = () => {
+  if (isRecording.value) {
+    // 停止录音
+    isRecording.value = false
+    toast.info('语音录制已停止（功能开发中）')
+  } else {
+    // 开始录音
+    isRecording.value = true
+    toast.info('语音录制已开始（功能开发中）')
+  }
 }
 
 const handleFileError = (message: string) => {
@@ -1455,15 +1565,9 @@ const handleMainDrop = (e: DragEvent) => {
     return
   }
   
-  // Add files to selector
+  // Add files to selectedFiles
   selectedFiles.value.push(...files)
-  
-  // Notify file selector to update its display
-  if (fileSelectorRef.value) {
-    // The FileSelector component will handle the display
-    handleFilesChange(selectedFiles.value)
-  }
-  
+
   toast.success(t('chat.filesAdded', { count: files.length }))
 }
 
@@ -2334,6 +2438,78 @@ onBeforeUnmount(() => {
   padding: 0 4px;
   align-self: flex-end;
   margin-bottom: 4px;
+  gap: 4px;
+}
+
+/* 附件按钮 */
+.attach-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-tertiary, #9ca3af);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.attach-btn:hover {
+  background: var(--hover-bg, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
+}
+
+.attach-btn.has-items {
+  color: var(--color-primary, #3b82f6);
+}
+
+.attach-btn.has-items:hover {
+  color: var(--color-primary-hover, #2563eb);
+}
+
+.action-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-primary, #3b82f6);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+/* 语音按钮 */
+.voice-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-tertiary, #9ca3af);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.voice-btn:hover {
+  background: var(--hover-bg, #f3f4f6);
+  color: var(--text-secondary, #6b7280);
 }
 
 /* 发送按钮 */

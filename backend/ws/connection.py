@@ -142,6 +142,7 @@ class ClientMessage(BaseModel):
     type: str = Field(..., description="消息类型")
     session_id: str = Field(..., alias="sessionId", description="会话 ID")
     content: str | None = Field(None, description="消息内容（ping 消息可选）")
+    attachments: list[str] | None = Field(None, description="附件路径列表（可选，用于多模态）")
 
 
 class ServerMessage(BaseModel):

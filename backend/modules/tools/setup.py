@@ -183,5 +183,20 @@ def register_all_tools(
     except Exception as e:
         logger.warning(f"Failed to register vector memory tools: {e}")
 
+    # 10. 注册多模态生成工具（图像生成、TTS、视频理解）
+    try:
+        from backend.modules.tools.multimodal_tools import (
+            GenerateImageTool,
+            TextToSpeechTool,
+            UnderstandVideoTool,
+        )
+
+        tools.register(GenerateImageTool())
+        tools.register(TextToSpeechTool())
+        tools.register(UnderstandVideoTool())
+        logger.debug("Registered multimodal generation tools")
+    except Exception as e:
+        logger.error(f"Failed to register multimodal tools: {e}")
+
     logger.debug(f"Registered {len(tools.get_definitions())} tools")
     return tools

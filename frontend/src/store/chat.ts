@@ -28,6 +28,15 @@ export interface Message {
         status: string
         duration?: number | null
     }>
+    images?: Array<{
+        src: string
+        alt?: string
+        caption?: string
+    }>
+    audio?: Array<{
+        src: string
+        name?: string
+    }>
 }
 
 export const useChatStore = defineStore('chat', () => {

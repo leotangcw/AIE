@@ -71,9 +71,10 @@ async def handle_message_event(
     """
     session_id = message.session_id
     content = message.content
+    attachments = message.attachments  # 多模态附件
 
     logger.info(
-        f"收到消息 - 连接:{connection_id}, 会话:{session_id}, 内容:{content[:50]}..."
+        f"收到消息 - 连接:{connection_id}, 会话:{session_id}, 内容:{content[:50]}..., 附件:{attachments}"
     )
 
     try:
@@ -152,6 +153,7 @@ async def handle_message_event(
             message=content,
             session_id=session_id,
             context=context,
+            media=attachments,
             cancel_token=cancel_token,
             model_override=model_override,
         ):
