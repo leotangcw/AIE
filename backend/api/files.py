@@ -16,7 +16,7 @@ async def get_file(path: str):
     """获取上传的文件
 
     Args:
-        path: 文件路径（如 uploads/xxx.png）
+        path: 文件路径（如 uploads/xxx.png 或 xxx.png）
 
     Returns:
         文件内容
@@ -25,10 +25,14 @@ async def get_file(path: str):
     if ".." in path or path.startswith("/"):
         raise HTTPException(status_code=403, detail="非法路径")
 
+    # 如果路径包含 uploads/ 前缀，去掉它
+    if path.startswith("uploads/"):
+        path = path[len("uploads/"):]
+
     file_path = UPLOAD_DIR / path
 
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="文件不存在")
+        raise HTTPException(status_code=404, detail=f"文件不存在: {path}")
 
     # 根据文件扩展名确定 content-type
     ext = file_path.suffix.lower()
