@@ -1353,10 +1353,10 @@ async function doSendMessage(message: string) {
           const result = await response.json()
           if (result.path) {
             attachments.push(result.path)
-            // 为图片生成预览 URL（用于前端显示）
+            // 图片使用服务器返回的相对路径，前端通过 /api/files/ 访问
             if (file.type.startsWith('image/')) {
               uploadedImages.push({
-                src: URL.createObjectURL(file),
+                src: result.path,  // e.g., "uploads/xxx.png"
                 alt: file.name
               })
             }

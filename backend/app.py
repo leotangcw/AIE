@@ -17,7 +17,7 @@ setup_logger()
 def _create_shared_components(config):
     """创建共享组件（WebSocket 和渠道处理器共用）"""
     from loguru import logger
-    from backend.modules.providers.litellm_provider import LiteLLMProvider
+    from backend.modules.providers.factory import create_provider
     from backend.modules.providers.registry import get_provider_metadata
     from backend.modules.agent.context import ContextBuilder
     from backend.modules.agent.memory import MemoryStore
@@ -46,8 +46,8 @@ def _create_shared_components(config):
         workspace = WORKSPACE_DIR  # 使用统一路径管理的默认工作区
     workspace.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Creating LiteLLM provider...")
-    provider = LiteLLMProvider(
+    logger.info("Creating provider...")
+    provider = create_provider(
         api_key=api_key,
         api_base=api_base,
         default_model=config.model.model,
@@ -443,6 +443,9 @@ from backend.api.heartbeat import router as heartbeat_router
 from backend.api.todo import router as todo_router
 from backend.modules.knowledge_hub.api import router as knowledge_hub_router
 from backend.api.memory_vector import router as memory_vector_router
+from backend.api.upload import router as upload_router
+from backend.api.files import router as files_router
+from backend.api.multimodal import router as multimodal_router
 
 app.include_router(auth_router)
 app.include_router(chat_router)
@@ -469,6 +472,9 @@ app.include_router(task_items_router)
 app.include_router(heartbeat_router)
 app.include_router(todo_router)
 app.include_router(knowledge_hub_router)
+app.include_router(upload_router)
+app.include_router(files_router)
+app.include_router(multimodal_router)
 
 
 # WebSocket 端点
@@ -480,7 +486,7 @@ from backend.ws.connection import handle_websocket
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket 聊天端点，复用共享组件"""
     from backend.modules.agent.loop import AgentLoop
-    from backend.modules.providers.litellm_provider import LiteLLMProvider
+    from backend.modules.providers.factory import create_provider
     from backend.modules.providers.registry import get_provider_metadata
     from backend.modules.tools.setup import register_all_tools
 
@@ -550,7 +556,7 @@ async def websocket_endpoint(websocket: WebSocket):
         else (provider_meta.default_api_base if provider_meta else None)
     )
 
-    provider = LiteLLMProvider(
+    provider = create_provider(
         api_key=api_key,
         api_base=api_base,
         default_model=config.model.model,

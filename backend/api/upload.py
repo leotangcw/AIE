@@ -93,9 +93,12 @@ async def upload_file(
 
         logger.info(f"文件上传成功: {file_path}")
 
+        # 返回相对路径（相对于 uploads 目录）
+        relative_path = f"uploads/{unique_name}"
+
         return {
             "success": True,
-            "path": str(file_path),
+            "path": relative_path,
             "filename": file.filename,
             "size": size,
             "type": content_type,
