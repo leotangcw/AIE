@@ -30,15 +30,15 @@ class SQLiteDatabase:
                 self._connection.row_factory = sqlite3.Row
             return self._connection
 
-    async def execute(self, sql: str, params: Optional[tuple] = None) -> sqlite3.Cursor:
-        """执行 SQL"""
+    async def execute(self, sql: str, params: Optional[tuple] = None) -> int:
+        """执行 SQL，返回影响的行数"""
         params = params or ()
         conn = await self.get_connection()
         cursor = conn.cursor()
         try:
             cursor.execute(sql, params)
             conn.commit()
-            return cursor
+            return cursor.rowcount
         finally:
             cursor.close()
 
