@@ -1,4 +1,18 @@
-"""Vector Store using SQLite + bge-small-zh-v1.5 embedding"""
+"""Vector Store using SQLite + bge-small-zh-v1.5 embedding
+
+DEPRECATED: This module is deprecated.
+Use backend.infrastructure.vector_store.SQLiteVectorStore instead.
+Unified BGE-M3 1024 dimension embeddings.
+"""
+
+import warnings
+
+warnings.warn(
+    "backend.modules.agent.vector_store.VectorStore is deprecated. "
+    "Use backend.infrastructure.vector_store.SQLiteVectorStore instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 import json
 import sqlite3
