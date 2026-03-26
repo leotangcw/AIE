@@ -44,10 +44,20 @@ class EmbeddingConfig(BaseModel):
     max_length: int = 8192
     device: str = "auto"
     use_fp16: bool = True
-    cache_dir: Optional[str] = None
+    cache_dir: Optional[str] = None  # 默认使用 data/model_cache
     use_modelscope: bool = True
     modelscope_endpoint: Optional[str] = None
     api_fallback: Optional[APIFallbackConfig] = None
+
+    def get_cache_dir(self) -> str:
+        """获取缓存目录（延迟计算）"""
+        if self.cache_dir:
+            return self.cache_dir
+        # 默认使用 data/model_cache
+        from backend.utils.paths import get_data_dir
+        cache_path = get_data_dir() / "model_cache"
+        cache_path.mkdir(parents=True, exist_ok=True)
+        return str(cache_path)
 
 
 class BuiltInModelConfig(BaseModel):

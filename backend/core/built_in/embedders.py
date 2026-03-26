@@ -58,6 +58,14 @@ class UnifiedEmbedder:
             if self._local_model is not None:
                 return
 
+            # 设置缓存目录（关键：避免每次重新下载）
+            cache_dir = config.get_cache_dir() if hasattr(config, 'get_cache_dir') else getattr(config, 'cache_dir', None)
+            if cache_dir:
+                os.environ["HF_HOME"] = cache_dir
+                os.environ["TRANSFORMERS_CACHE"] = cache_dir
+                os.environ["SENTENCE_TRANSFORMERS_HOME"] = cache_dir
+                logger.info(f"Model cache directory set: {cache_dir}")
+
             # 设置 ModelScope 镜像（国内加速）
             if config.use_modelscope:
                 endpoint = config.modelscope_endpoint or "https://hf-mirror.com"
@@ -76,6 +84,7 @@ class UnifiedEmbedder:
                         config.model,
                         use_fp16=config.use_fp16,
                         device=device,
+                        cache_dir=cache_dir,  # 添加缓存目录
                     )
 
                 self._local_model = await asyncio.to_thread(load_bge_model)
@@ -93,7 +102,11 @@ class UnifiedEmbedder:
 
                 # CPU/GPU-bound operation - run in thread pool
                 def load_st_model():
-                    return SentenceTransformer(config.model, device=device)
+                    return SentenceTransformer(
+                        config.model,
+                        device=device,
+                        cache_folder=cache_dir,  # 添加缓存目录
+                    )
 
                 self._local_model = await asyncio.to_thread(load_st_model)
                 logger.info(f"Embedder loaded via sentence-transformers on {device}")
