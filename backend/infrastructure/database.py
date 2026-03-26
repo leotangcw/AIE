@@ -3,6 +3,7 @@
 """SQLite 数据库封装"""
 
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Optional
 from loguru import logger
@@ -15,43 +16,64 @@ class SQLiteDatabase:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._connection: Optional[sqlite3.Connection] = None
+        self._lock = threading.Lock()
         logger.info(f"Database initialized at {self.db_path}")
 
     async def get_connection(self) -> sqlite3.Connection:
         """获取数据库连接"""
-        if self._connection is None:
-            self._connection = sqlite3.connect(
-                str(self.db_path),
-                check_same_thread=False,
-            )
-            self._connection.row_factory = sqlite3.Row
-        return self._connection
+        with self._lock:
+            if self._connection is None:
+                self._connection = sqlite3.connect(
+                    str(self.db_path),
+                    check_same_thread=False,
+                )
+                self._connection.row_factory = sqlite3.Row
+            return self._connection
 
-    async def execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
+    async def execute(self, sql: str, params: Optional[tuple] = None) -> sqlite3.Cursor:
         """执行 SQL"""
+        params = params or ()
         conn = await self.get_connection()
         cursor = conn.cursor()
-        cursor.execute(sql, params)
-        conn.commit()
-        return cursor
+        try:
+            cursor.execute(sql, params)
+            conn.commit()
+            return cursor
+        finally:
+            cursor.close()
 
-    async def fetchall(self, sql: str, params: tuple = ()) -> list:
+    async def fetchall(self, sql: str, params: Optional[tuple] = None) -> list[sqlite3.Row]:
         """查询所有行"""
+        params = params or ()
         conn = await self.get_connection()
         cursor = conn.cursor()
-        cursor.execute(sql, params)
-        return cursor.fetchall()
+        try:
+            cursor.execute(sql, params)
+            return cursor.fetchall()
+        finally:
+            cursor.close()
 
-    async def fetchone(self, sql: str, params: tuple = ()) -> Optional[sqlite3.Row]:
+    async def fetchone(self, sql: str, params: Optional[tuple] = None) -> Optional[sqlite3.Row]:
         """查询单行"""
+        params = params or ()
         conn = await self.get_connection()
         cursor = conn.cursor()
-        cursor.execute(sql, params)
-        return cursor.fetchone()
+        try:
+            cursor.execute(sql, params)
+            return cursor.fetchone()
+        finally:
+            cursor.close()
 
     async def close(self):
         """关闭连接"""
+        with self._lock:
+            if self._connection:
+                self._connection.close()
+                self._connection = None
+                logger.info("Database connection closed")
+
+    def __del__(self):
+        """清理资源"""
         if self._connection:
             self._connection.close()
             self._connection = None
-            logger.info("Database connection closed")
