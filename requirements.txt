@@ -38,7 +38,16 @@ python-telegram-bot>=20.7
 
 # 向量检索（知识库）
 sentence-transformers>=2.2.0
+FlagEmbedding>=1.2.0
 numpy>=1.24.0
+
+# GraphRAG 知识图谱检索（LightRAG）
+lightrag-hku>=1.0.0
+networkx>=3.0
+nano-vectordb>=0.0.1
+json_repair>=0.7.0
+pypinyin>=0.51.0
+pandas>=2.0.0
 
 # 多模态文件读取（可选）
 pypdf>=3.0.0
