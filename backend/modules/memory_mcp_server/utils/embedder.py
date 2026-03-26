@@ -10,6 +10,7 @@ Includes UnifiedEmbedderAdapter for integration with ModelRegistry.
 import asyncio
 import os
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Protocol, Optional, TYPE_CHECKING
 
@@ -60,6 +61,9 @@ class UnifiedEmbedderAdapter:
     - Consistent 1024 dimension (BGE-M3)
     """
 
+    # Class-level executor for async operations
+    _executor: Optional["ThreadPoolExecutor"] = None
+
     def __init__(self, registry: Optional["ModelRegistry"] = None):
         """
         Initialize the adapter.
@@ -72,6 +76,7 @@ class UnifiedEmbedderAdapter:
         self._embedder: Optional["UnifiedEmbedder"] = None
         self._dimension = BGE_M3_DIMENSION
         self._initialized = False
+        self._lock = asyncio.Lock()  # Thread safety lock
 
     def _get_registry(self) -> "ModelRegistry":
         """Get the ModelRegistry instance."""
@@ -81,23 +86,25 @@ class UnifiedEmbedderAdapter:
         return self._registry
 
     async def _ensure_embedder(self) -> "UnifiedEmbedder":
-        """Ensure the embedder is initialized (async)."""
+        """Ensure the embedder is initialized (async, thread-safe)."""
         if self._embedder is None:
-            try:
-                registry = self._get_registry()
-                self._embedder = await registry.get_embedder()
-                self._initialized = True
-                logger.debug("UnifiedEmbedderAdapter: embedder initialized")
-            except Exception as e:
-                from backend.core.model_registry import EmbedderUnavailableError
-                if isinstance(e, EmbedderUnavailableError):
-                    logger.error(f"UnifiedEmbedderAdapter: embedder unavailable: {e}")
-                    raise EmbedderUnavailableError(
-                        "Memory embedder unavailable. "
-                        "Install FlagEmbedding (pip install FlagEmbedding) or "
-                        "configure API fallback."
-                    ) from e
-                raise
+            async with self._lock:
+                if self._embedder is None:  # Double-check after lock
+                    try:
+                        registry = self._get_registry()
+                        self._embedder = await registry.get_embedder()
+                        self._initialized = True
+                        logger.debug("UnifiedEmbedderAdapter: embedder initialized")
+                    except Exception as e:
+                        from backend.core.model_registry import EmbedderUnavailableError
+                        if isinstance(e, EmbedderUnavailableError):
+                            logger.error(f"UnifiedEmbedderAdapter: embedder unavailable: {e}")
+                            raise EmbedderUnavailableError(
+                                "Memory embedder unavailable. "
+                                "Install FlagEmbedding (pip install FlagEmbedding) or "
+                                "configure API fallback."
+                            ) from e
+                        raise
         return self._embedder
 
     def _run_async(self, coro):
@@ -108,14 +115,24 @@ class UnifiedEmbedderAdapter:
             loop = None
 
         if loop and loop.is_running():
-            # We're in an async context, create a new thread
+            # We're in an async context, Use class-level executor.
             import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, coro)
-                return future.result()
+            if UnifiedEmbedderAdapter._executor is None:
+                UnifiedEmbedderAdapter._executor = concurrent.futures.ThreadPoolExecutor(
+                    max_workers=4, thread_name_prefix="unified_embedder_"
+                )
+            future = UnifiedEmbedderAdapter._executor.submit(asyncio.run, coro)
+            return future.result()
         else:
             # No running loop, we can use asyncio.run
             return asyncio.run(coro)
+
+    @classmethod
+    def shutdown(cls):
+        """Shutdown the class-level executor."""
+        if cls._executor is not None:
+            cls._executor.shutdown(wait=True)
+            cls._executor = None
 
     def embed(self, text: str) -> list[float]:
         """
@@ -387,7 +404,7 @@ class OpenAIEmbedder(BaseEmbedder):
         if self.client is None:
             from openai import OpenAI
             self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        return self._client
+        return self.client
 
     def _call_api(self, texts: list[str]) -> list[list[float]]:
         """Call OpenAI embeddings API."""
