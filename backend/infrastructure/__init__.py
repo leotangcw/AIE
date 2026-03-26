@@ -2,6 +2,7 @@
 
 """基础设施层"""
 
+import asyncio
 import threading
 from typing import Optional
 from loguru import logger
@@ -19,27 +20,34 @@ class Infrastructure:
         self._db: Optional[SQLiteDatabase] = None
         self._vector_store: Optional[SQLiteVectorStore] = None
         self._cache: Optional[SQLiteCache] = None
+        self._lock = asyncio.Lock()  # Thread safety lock
 
     async def get_database(self) -> SQLiteDatabase:
         """获取数据库连接"""
         if self._db is None:
-            self._db = SQLiteDatabase(self._config.database.path)
+            async with self._lock:
+                if self._db is None:  # Double-check after lock
+                    self._db = SQLiteDatabase(self._config.database.path)
         return self._db
 
     async def get_vector_store(self) -> SQLiteVectorStore:
         """获取向量存储（统一 1024 维）"""
         if self._vector_store is None:
-            db = await self.get_database()
-            self._vector_store = SQLiteVectorStore(db, dimension=1024)
-            await self._vector_store.initialize()
+            async with self._lock:
+                if self._vector_store is None:  # Double-check after lock
+                    db = await self.get_database()
+                    self._vector_store = SQLiteVectorStore(db, dimension=1024)
+                    await self._vector_store.initialize()
         return self._vector_store
 
     async def get_cache(self) -> SQLiteCache:
         """获取缓存"""
         if self._cache is None:
-            db = await self.get_database()
-            self._cache = SQLiteCache(db)
-            await self._cache.initialize()
+            async with self._lock:
+                if self._cache is None:  # Double-check after lock
+                    db = await self.get_database()
+                    self._cache = SQLiteCache(db)
+                    await self._cache.initialize()
         return self._cache
 
     async def initialize(self):
