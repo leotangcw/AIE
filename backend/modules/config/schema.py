@@ -1,4 +1,5 @@
 """配置数据模型"""
+from __future__ import annotations
 
 from typing import Optional, Literal
 
@@ -10,6 +11,48 @@ class ProviderConfig(BaseModel):
     api_key: str = ""
     api_base: Optional[str] = None
     enabled: bool = False
+
+
+class SubAgentConfig(BaseModel):
+    """子代理模型配置"""
+    enabled: bool = False
+    provider: str = "qwen"
+    model: str = "qwen-turbo"
+    max_concurrent: int = 3
+    temperature: float = Field(default=0.5, ge=0.0, le=2.0)
+    max_tokens: int = Field(default=2048, ge=0)
+
+
+class DatabaseConfig(BaseModel):
+    """数据库配置"""
+    path: str = Field(default="data/aie.db", description="SQLite 数据库路径")
+    echo: bool = False
+
+
+class APIFallbackConfig(BaseModel):
+    """Embedding API 回退配置"""
+    provider: str = "qwen_bailian"
+    model: str = "text-embedding-v3"
+    api_key: Optional[str] = None
+    api_base: Optional[str] = None
+
+
+class EmbeddingConfig(BaseModel):
+    """Embedding 配置 - 统一 BGE-M3"""
+    model: str = "BAAI/bge-m3"
+    dimension: int = 1024
+    max_length: int = 8192
+    device: str = "auto"
+    use_fp16: bool = True
+    cache_dir: Optional[str] = None
+    use_modelscope: bool = True
+    modelscope_endpoint: Optional[str] = None
+    api_fallback: Optional[APIFallbackConfig] = None
+
+
+class BuiltInModelConfig(BaseModel):
+    """内置模型配置"""
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
 
 
 class ModelConfig(BaseModel):
@@ -205,6 +248,9 @@ class AppConfig(BaseModel):
     """应用配置"""
     providers: dict[str, ProviderConfig] = Field(default_factory=dict)
     model: ModelConfig = Field(default_factory=ModelConfig)
+    sub_agent: SubAgentConfig = Field(default_factory=SubAgentConfig)
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    built_in: BuiltInModelConfig = Field(default_factory=BuiltInModelConfig)
     workspace: WorkspaceConfig = Field(default_factory=WorkspaceConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     tool_history: ToolHistoryConfig = Field(default_factory=ToolHistoryConfig)
