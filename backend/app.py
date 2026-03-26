@@ -10,6 +10,8 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from backend.utils.logger import setup_logger
+from backend.core.model_registry import init_model_registry, get_model_registry
+from backend.infrastructure import init_infrastructure, get_infrastructure
 
 setup_logger()
 
@@ -150,6 +152,28 @@ async def lifespan(app: FastAPI):
     app.state.shared = shared
     logger.info("Shared components created")
 
+    # 初始化 ModelRegistry
+    logger.info("Initializing ModelRegistry...")
+    model_registry = await init_model_registry(config)
+    shared["model_registry"] = model_registry
+    logger.info("ModelRegistry initialized")
+
+    # 初始化 Infrastructure
+    logger.info("Initializing Infrastructure...")
+    infrastructure = await init_infrastructure(config)
+    shared["infrastructure"] = infrastructure
+    logger.info("Infrastructure initialized")
+
+    # 注入 Embedder 到 VectorStore (可选功能)
+    logger.info("Injecting Embedder into VectorStore...")
+    try:
+        embedder = await model_registry.get_embedder()
+        vector_store = await infrastructure.get_vector_store()
+        vector_store.set_embedder(embedder)
+        logger.info("Embedder injected into VectorStore")
+    except Exception as e:
+        logger.warning(f"Embedder injection failed (vector search may be limited): {e}")
+
     # 初始化 MemoryPlugin (MCP Server 自动启动/停止)
     logger.info("Initializing MemoryPlugin (MCP Server)...")
     try:
@@ -180,6 +204,50 @@ async def lifespan(app: FastAPI):
         logger.warning(f"MemoryPlugin init failed (optional): {e}")
         shared["memory_plugin"] = None
         shared["memory_adapter"] = None
+
+    # 初始化 GraphRAG 模块（可选增强功能）
+    logger.info("Initializing GraphRAG module (optional)...")
+    try:
+        from backend.modules.graph_rag import LIGHTERAG_AVAILABLE, set_llm_config, set_embed_config
+
+        if LIGHTERAG_AVAILABLE:
+            # 设置 GraphRAG 的 LLM 配置（使用 AIE 的配置）
+            provider_id = config.model.provider
+            provider_config = config.providers.get(provider_id)
+            provider_meta = get_provider_metadata(provider_id)
+
+            api_key = provider_config.api_key if provider_config else None
+            api_base = (
+                provider_config.api_base
+                if provider_config and provider_config.api_base
+                else (provider_meta.default_api_base if provider_meta else None)
+            )
+
+            if api_key:
+                set_llm_config(
+                    model=config.model.model,
+                    api_key=api_key,
+                    api_base=api_base or "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                )
+                # Embedding 使用相同配置
+                set_embed_config(
+                    model="text-embedding-v3",
+                    api_key=api_key,
+                    api_base=api_base or "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                    dim=1024,
+                )
+                logger.info(f"GraphRAG LLM config set: model={config.model.model}")
+            else:
+                logger.warning("GraphRAG: No API key configured, will try environment variables")
+
+            shared["graph_rag_available"] = True
+            logger.info("GraphRAG module initialized (LightRAG available)")
+        else:
+            shared["graph_rag_available"] = False
+            logger.info("GraphRAG module not available (LightRAG not installed)")
+    except Exception as e:
+        logger.warning(f"GraphRAG init failed (optional): {e}")
+        shared["graph_rag_available"] = False
 
     logger.info("Creating message queue and rate limiter...")
     message_queue = EnterpriseMessageQueue(
@@ -370,6 +438,24 @@ async def lifespan(app: FastAPI):
     # 正常关闭流程
     logger.info("Initiating graceful shutdown...")
 
+    # 清理 ModelRegistry
+    try:
+        model_registry = shared.get("model_registry")
+        if model_registry:
+            await model_registry.close()
+            logger.info("ModelRegistry closed")
+    except Exception as e:
+        logger.warning(f"ModelRegistry shutdown error: {e}")
+
+    # 清理 Infrastructure
+    try:
+        infrastructure = shared.get("infrastructure")
+        if infrastructure:
+            await infrastructure.finalize()
+            logger.info("Infrastructure finalized")
+    except Exception as e:
+        logger.warning(f"Infrastructure shutdown error: {e}")
+
     # 停止 MemoryPlugin (MCP Server)
     try:
         from backend.modules.mcp.memory_plugin import close_memory_plugin
@@ -377,6 +463,21 @@ async def lifespan(app: FastAPI):
         logger.info("MemoryPlugin stopped")
     except Exception as e:
         logger.warning(f"MemoryPlugin shutdown error: {e}")
+
+    # 清理 GraphRAG 资源（可选）
+    if shared.get("graph_rag_available"):
+        try:
+            from backend.modules.graph_rag.core import GraphRAGClient
+
+            # 清理所有缓存的客户端实例
+            for key in list(GraphRAGClient._instances.keys()):
+                client = GraphRAGClient._instances.get(key)
+                if client:
+                    await client.finalize()
+            GraphRAGClient._instances.clear()
+            logger.info("GraphRAG resources cleaned up")
+        except Exception as e:
+            logger.warning(f"GraphRAG cleanup error: {e}")
 
     await channel_manager.stop_all()
     await scheduler.stop()
@@ -446,6 +547,7 @@ from backend.api.memory_vector import router as memory_vector_router
 from backend.api.upload import router as upload_router
 from backend.api.files import router as files_router
 from backend.api.multimodal import router as multimodal_router
+from backend.modules.graph_rag import api_router as graph_rag_router
 
 app.include_router(auth_router)
 app.include_router(chat_router)
@@ -475,6 +577,7 @@ app.include_router(knowledge_hub_router)
 app.include_router(upload_router)
 app.include_router(files_router)
 app.include_router(multimodal_router)
+app.include_router(graph_rag_router)
 
 
 # WebSocket 端点
