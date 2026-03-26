@@ -2,6 +2,8 @@
 
 """统一模型注册中心"""
 
+import asyncio
+import threading
 from typing import Optional, Any, TYPE_CHECKING
 from loguru import logger
 
@@ -29,13 +31,17 @@ class ModelRegistry:
         self._sub_llm: Optional[Any] = None
         # Embedder
         self._embedder: Optional["UnifiedEmbedder"] = None
+        # 线程安全锁
+        self._lock = asyncio.Lock()
 
     # ========== LLM ==========
 
     async def get_llm(self) -> Any:
         """获取主 LLM 客户端"""
         if self._llm is None:
-            self._llm = await self._create_llm(self._config.model)
+            async with self._lock:
+                if self._llm is None:  # Double-check after lock
+                    self._llm = await self._create_llm(self._config.model)
         return self._llm
 
     async def get_sub_llm(self) -> Optional[Any]:
@@ -43,7 +49,9 @@ class ModelRegistry:
         if not self._config.sub_agent.enabled:
             return None
         if self._sub_llm is None:
-            self._sub_llm = await self._create_llm(self._config.sub_agent)
+            async with self._lock:
+                if self._sub_llm is None:  # Double-check after lock
+                    self._sub_llm = await self._create_llm(self._config.sub_agent)
         return self._sub_llm
 
     async def _create_llm(self, model_config) -> Any:
@@ -65,7 +73,9 @@ class ModelRegistry:
     async def get_embedder(self) -> "UnifiedEmbedder":
         """获取统一 Embedder"""
         if self._embedder is None:
-            self._embedder = await self._create_embedder()
+            async with self._lock:
+                if self._embedder is None:  # Double-check after lock
+                    self._embedder = await self._create_embedder()
         return self._embedder
 
     async def _create_embedder(self) -> "UnifiedEmbedder":
@@ -106,23 +116,36 @@ class ModelRegistry:
             "API fallback in built_in.embedding.api_fallback"
         )
 
+    async def close(self) -> None:
+        """清理资源"""
+        async with self._lock:
+            self._llm = None
+            self._sub_llm = None
+            self._embedder = None
+        logger.info("ModelRegistry closed")
+
 
 # 全局单例
 _registry: Optional[ModelRegistry] = None
+_registry_lock = threading.Lock()
 
 
 def get_model_registry() -> ModelRegistry:
     """获取模型注册中心"""
-    if _registry is None:
-        raise RuntimeError("ModelRegistry not initialized")
-    return _registry
+    with _registry_lock:
+        if _registry is None:
+            raise RuntimeError("ModelRegistry not initialized")
+        return _registry
 
 
 async def init_model_registry(config) -> ModelRegistry:
     """初始化模型注册中心"""
     global _registry
-    _registry = ModelRegistry(config)
-    # 预热主 LLM
+    with _registry_lock:
+        if _registry is not None:
+            return _registry  # Already initialized
+        _registry = ModelRegistry(config)
+    # 预热主 LLM (outside lock to avoid holding lock during I/O)
     await _registry.get_llm()
     logger.info("ModelRegistry initialized")
     return _registry
