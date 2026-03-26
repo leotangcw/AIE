@@ -206,42 +206,15 @@ async def lifespan(app: FastAPI):
         shared["memory_adapter"] = None
 
     # 初始化 GraphRAG 模块（可选增强功能）
+    # GraphRAG 现在使用 ModelRegistry 获取 LLM 和 Embedder
     logger.info("Initializing GraphRAG module (optional)...")
     try:
-        from backend.modules.graph_rag import LIGHTERAG_AVAILABLE, set_llm_config, set_embed_config
+        from backend.modules.graph_rag import LIGHTERAG_AVAILABLE
 
         if LIGHTERAG_AVAILABLE:
-            # 设置 GraphRAG 的 LLM 配置（使用 AIE 的配置）
-            provider_id = config.model.provider
-            provider_config = config.providers.get(provider_id)
-            provider_meta = get_provider_metadata(provider_id)
-
-            api_key = provider_config.api_key if provider_config else None
-            api_base = (
-                provider_config.api_base
-                if provider_config and provider_config.api_base
-                else (provider_meta.default_api_base if provider_meta else None)
-            )
-
-            if api_key:
-                set_llm_config(
-                    model=config.model.model,
-                    api_key=api_key,
-                    api_base=api_base or "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                )
-                # Embedding 使用相同配置
-                set_embed_config(
-                    model="text-embedding-v3",
-                    api_key=api_key,
-                    api_base=api_base or "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                    dim=1024,
-                )
-                logger.info(f"GraphRAG LLM config set: model={config.model.model}")
-            else:
-                logger.warning("GraphRAG: No API key configured, will try environment variables")
-
+            # GraphRAG 使用 ModelRegistry 获取模型，无需额外配置
             shared["graph_rag_available"] = True
-            logger.info("GraphRAG module initialized (LightRAG available)")
+            logger.info("GraphRAG module initialized (LightRAG available, using ModelRegistry)")
         else:
             shared["graph_rag_available"] = False
             logger.info("GraphRAG module not available (LightRAG not installed)")
