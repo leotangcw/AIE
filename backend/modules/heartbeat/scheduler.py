@@ -179,32 +179,32 @@ class HeartbeatScheduler:
         if not tasks:
             return
 
-            # 按 session_id 分组，coalescing
-            for task in tasks:
-                key = f"{task.session_id}:{task.task_type}"
-                if key in self._pending_wakes:
-                    existing = self._pending_wakes[key]
-                    # 保留更高优先级的
-                    if self._higher_priority(task, existing.task):
-                        self._pending_wakes[key] = PendingWake(
-                            task=task, reason="interval", requested_at=time.time()
-                        )
-                else:
+        # 按 session_id 分组，coalescing
+        for task in tasks:
+            key = f"{task.session_id}:{task.task_type}"
+            if key in self._pending_wakes:
+                existing = self._pending_wakes[key]
+                # 保留更高优先级的
+                if self._higher_priority(task, existing.task):
                     self._pending_wakes[key] = PendingWake(
                         task=task, reason="interval", requested_at=time.time()
                     )
+            else:
+                self._pending_wakes[key] = PendingWake(
+                    task=task, reason="interval", requested_at=time.time()
+                )
 
-            # 等待 coalescing 窗口（复制当前 keys，避免新条目被误删）
-            pending_keys = list(self._pending_wakes.keys())
-            await asyncio.sleep(COALESCE_WINDOW_MS / 1000)
+        # 等待 coalescing 窗口（复制当前 keys，避免新条目被误删）
+        pending_keys = list(self._pending_wakes.keys())
+        await asyncio.sleep(COALESCE_WINDOW_MS / 1000)
 
-            # 执行所有待处理任务（只处理等待期间存在的 key）
-            for key in pending_keys:
-                wake = self._pending_wakes.pop(key, None)
-                if wake and self._running:
-                    asyncio.create_task(
-                        self._execute_task(wake.task, wake.reason)
-                    )
+        # 执行所有待处理任务（只处理等待期间存在的 key）
+        for key in pending_keys:
+            wake = self._pending_wakes.pop(key, None)
+            if wake and self._running:
+                asyncio.create_task(
+                    self._execute_task(wake.task, wake.reason)
+                )
 
     async def _execute_task(self, task: HeartbeatTask, reason: str):
         """执行单个任务"""

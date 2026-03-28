@@ -460,7 +460,7 @@ class SubagentManager:
         try:
             result = await db.execute(
                 select(TaskItem).where(
-                    TaskItem.status.in_(["running", "sleeping", "SLEEPING", "RUNNING"])
+                    TaskItem.status.in_(["running", "sleeping"])
                 )
             )
             items = result.scalars().all()
@@ -569,7 +569,7 @@ class SubagentManager:
                 # 检查任务结果
                 if task.status == "done":
                     break  # 成功，退出重试循环
-                if task.status == "SLEEPING":
+                if task.status == "sleeping":
                     # 长时任务已启动后台进程，进入心跳监控，退出重试循环
                     break
                 elif task.status == "failed":
@@ -836,8 +836,8 @@ class SubagentManager:
                     await handler.notify_failed(task.error)
                 return
 
-            # 转入 SLEEPING 状态
-            task.status = "SLEEPING"
+            # 转入 sleeping 状态
+            task.status = "sleeping"
             task.last_analysis = "任务已启动，等待首次心跳分析"
             task.next_check_at = datetime.utcnow() + timedelta(minutes=1)
 
@@ -849,7 +849,7 @@ class SubagentManager:
             if handler:
                 await handler.notify_progress(5, message="后台进程已启动，心跳监控中")
 
-            logger.info(f"[LongRunning] Task {task.task_id} entered SLEEPING, pid={task.monitoring_info.get('pid')}")
+            logger.info(f"[LongRunning] Task {task.task_id} entered sleeping, pid={task.monitoring_info.get('pid')}")
 
         except asyncio.CancelledError:
             task.status = "cancelled"

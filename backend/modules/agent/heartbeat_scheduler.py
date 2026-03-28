@@ -1,4 +1,4 @@
-"""心跳调度器 - 独立 asyncio 循环，定期唤醒 SLEEPING 子Agent 做 LLM 分析"""
+"""心跳调度器 - 独立 asyncio 循环，定期唤醒 sleeping 子Agent 做 LLM 分析"""
 
 import asyncio
 import json
@@ -78,7 +78,7 @@ class HeartbeatScheduler:
             logger.info("[HeartbeatScheduler] Stopped")
 
     async def _loop(self):
-        """主调度循环 - 串行唤醒 SLEEPING 任务"""
+        """主调度循环 - 串行唤醒 sleeping 任务"""
         try:
             while True:
                 tasks = self._get_sleeping_tasks()
@@ -90,7 +90,7 @@ class HeartbeatScheduler:
                 tasks.sort(key=lambda t: t.next_check_at or datetime.min)
 
                 for task in tasks:
-                    if task.status not in ("sleeping", "SLEEPING"):
+                    if task.status not in ("sleeping",):
                         continue
                     # 等到下次检查时间
                     now = datetime.utcnow()
@@ -105,15 +105,15 @@ class HeartbeatScheduler:
             logger.error(f"[HeartbeatScheduler] Loop error: {e}")
 
     def _get_sleeping_tasks(self) -> list:
-        """获取 SLEEPING 状态且有 monitoring_info 的任务"""
+        """获取 sleeping 状态且有 monitoring_info 的任务"""
         return [
             t for t in self.subagent_manager.tasks.values()
-            if t.status in ("sleeping", "SLEEPING") and t.monitoring_info
+            if t.status in ("sleeping",) and t.monitoring_info
         ]
 
     async def _analyze_task(self, task) -> None:
         """分析单个任务的进展"""
-        task.status = "ANALYZING"
+        task.status = "analyzing"
         task.wake_count += 1
         logger.info(f"[HeartbeatScheduler] Analyzing task {task.task_id} (wake #{task.wake_count})")
         try:
@@ -156,8 +156,8 @@ class HeartbeatScheduler:
             logger.error(f"[HeartbeatScheduler] Analysis failed for {task.task_id}: {e}")
             task.next_check_at = datetime.utcnow() + timedelta(seconds=30)
         finally:
-            if task.status == "ANALYZING":
-                task.status = "SLEEPING"
+            if task.status == "analyzing":
+                task.status = "sleeping"
             await self._sync_analysis_to_db(task)
 
     def _check_pid_alive(self, task) -> bool:

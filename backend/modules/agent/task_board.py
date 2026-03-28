@@ -129,6 +129,9 @@ class TaskBoardService:
             task.retry_count += 1
             if error_message:
                 task.error_message = error_message
+            # 失败时重置进度，避免显示虚假的高进度值
+            task.prev_progress = task.progress
+            task.progress = 0
 
         await self.db.commit()
         await self.db.refresh(task)
@@ -545,6 +548,7 @@ class TaskHeartbeatService:
 
     async def monitor_background_processes(self, subagent_manager) -> list:
         """检查所有运行中任务的后台进程状态"""
+        import json
         import os
 
         results = []
@@ -552,7 +556,7 @@ class TaskHeartbeatService:
             return results
 
         for task in subagent_manager.tasks.values():
-            if task.status != "running" or not task.monitoring_info:
+            if task.status not in ("running", "sleeping") or not task.monitoring_info:
                 continue
 
             pid = task.monitoring_info.get("pid")
@@ -564,7 +568,7 @@ class TaskHeartbeatService:
             alive = True
             try:
                 pid_result = os.waitpid(pid, os.WNOHANG)
-                if pid_result[0] == 0:  # 进程已退出
+                if pid_result[0] != 0:  # 进程已退出 (返回值为退出进程的 pid)
                     exit_code = os.WEXITSTATUS(pid_result[1])
                     alive = False
             except ChildProcessError:
@@ -599,6 +603,8 @@ class TaskHeartbeatService:
 
                                     if no_change >= 6:  # 30分钟 (5分钟间隔 × 6次)
                                         stuck = True
+                                        task_item.prev_progress = task_item.progress
+                                        task_item.progress = 0
                                         task_item.status = TaskStatus.FAILED.value
                                         task_item.error_message = (
                                             f"后台进程卡死（日志文件30分钟无变化, 大小={current_size}字节）"
@@ -642,6 +648,8 @@ class TaskHeartbeatService:
                             task.status = "done"
                             task.progress = 100
                         else:
+                            task_item.prev_progress = task_item.progress
+                            task_item.progress = 0
                             task_item.status = TaskStatus.FAILED.value
                             task_item.error_message = (
                                 f"后台进程退出 (exit_code={exit_code})"
@@ -710,6 +718,8 @@ class TaskHeartbeatService:
     @staticmethod
     def _check_process_result(log_file: str = None, exit_code: int = None) -> bool:
         """检查进程退出结果，优先使用退出码"""
+        import os
+
         # 退出码 0 = 成功
         if exit_code is not None:
             return exit_code == 0
