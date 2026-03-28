@@ -7,7 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.modules.config.loader import config_loader
-from backend.modules.config.schema import AppConfig, ModelConfig, ProviderConfig, ToolHistoryConfig, WorkspaceConfig
+from backend.modules.config.schema import (
+    AppConfig, ModelConfig, ProviderConfig, ToolHistoryConfig, WorkspaceConfig,
+    MainAgentConfig, SubAgentConfig, EnhancedModelConfig
+)
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -99,12 +102,48 @@ class ProviderConfigResponse(BaseModel):
 
 class ModelConfigResponse(BaseModel):
     """模型配置响应"""
-    
+
     provider: str = Field(..., description="Provider 名称")
     model: str = Field(..., description="模型名称")
     temperature: float = Field(..., description="温度参数")
     max_tokens: int = Field(..., description="最大 token 数")
     max_iterations: int = Field(..., description="最大迭代次数")
+
+
+class MainAgentConfigResponse(BaseModel):
+    """主 Agent 模型配置响应"""
+
+    provider: str = Field(..., description="Provider 名称")
+    model: str = Field(..., description="模型名称")
+    temperature: float = Field(..., description="温度参数")
+    max_tokens: int = Field(..., description="最大 token 数")
+    max_iterations: int = Field(..., description="最大迭代次数")
+    enabled: bool = Field(default=True, description="是否启用")
+    advanced_params: dict = Field(default_factory=dict, description="高级参数")
+
+
+class SubAgentConfigResponse(BaseModel):
+    """子 Agent 模型配置响应"""
+
+    enabled: bool = Field(..., description="是否启用")
+    provider: str = Field(..., description="Provider 名称")
+    model: str = Field(..., description="模型名称")
+    max_concurrent: int = Field(..., description="最大并发数")
+    temperature: float = Field(..., description="温度参数")
+    max_tokens: int = Field(..., description="最大 token 数")
+
+
+class EnhancedModelConfigResponse(BaseModel):
+    """增强模型配置响应"""
+
+    id: str = Field(..., description="模型 ID")
+    model_type: str = Field(..., description="模型类型")
+    provider: str = Field(..., description="Provider 名称")
+    model: str = Field(..., description="模型名称")
+    enabled: bool = Field(default=True, description="是否启用")
+    description: str = Field(default="", description="模型描述")
+    capabilities: list[str] = Field(default_factory=list, description="能力标签")
+    priority: int = Field(default=0, description="优先级")
 
 
 class WorkspaceConfigResponse(BaseModel):
@@ -171,6 +210,9 @@ class SettingsResponse(BaseModel):
 
     providers: dict[str, ProviderConfigResponse] = Field(..., description="Provider 配置")
     model: ModelConfigResponse = Field(..., description="模型配置")
+    main_agent: MainAgentConfigResponse = Field(..., description="主 Agent 模型配置")
+    sub_agent: SubAgentConfigResponse = Field(..., description="子 Agent 模型配置")
+    enhanced_models: list[EnhancedModelConfigResponse] = Field(default_factory=list, description="增强模型配置")
     workspace: WorkspaceConfigResponse = Field(..., description="工作空间配置")
     security: SecurityConfigResponse = Field(..., description="安全配置")
     tool_history: ToolHistoryConfigResponse = Field(..., description="工具调用历史配置")
@@ -182,6 +224,9 @@ class UpdateSettingsRequest(BaseModel):
 
     providers: dict[str, dict] | None = Field(None, description="Provider 配置")
     model: dict | None = Field(None, description="模型配置")
+    main_agent: dict | None = Field(None, description="主 Agent 模型配置")
+    sub_agent: dict | None = Field(None, description="子 Agent 模型配置")
+    enhanced_models: list[dict] | None = Field(None, description="增强模型配置")
     workspace: dict | None = Field(None, description="工作空间配置")
     security: dict | None = Field(None, description="安全配置")
     tool_history: dict | None = Field(None, description="工具调用历史配置")
@@ -190,7 +235,7 @@ class UpdateSettingsRequest(BaseModel):
 
 class TestConnectionRequest(BaseModel):
     """测试连接请求"""
-    
+
     provider: str = Field(..., description="Provider 名称")
     api_key: str = Field(default="", description="API 密钥")
     api_base: str | None = Field(None, description="API 基础 URL")
@@ -199,9 +244,37 @@ class TestConnectionRequest(BaseModel):
 
 class TestConnectionResponse(BaseModel):
     """测试连接响应"""
-    
+
     success: bool = Field(..., description="是否成功")
     message: str | None = Field(None, description="消息")
+    error: str | None = Field(None, description="错误信息")
+
+
+class TestEmbedderRequest(BaseModel):
+    """测试嵌入模型连接请求"""
+
+    provider: str = Field(..., description="API 提供商")
+    model: str = Field(default="text-embedding-v3", description="模型名称")
+    api_base: str | None = Field(None, description="API 基础 URL")
+
+
+class TestEmbedderResponse(BaseModel):
+    """测试嵌入模型响应"""
+
+    success: bool = Field(..., description="是否成功")
+    message: str | None = Field(None, description="消息")
+    error: str | None = Field(None, description="错误信息")
+    dimension: int | None = Field(None, description="向量维度")
+
+
+class EmbedderStatusResponse(BaseModel):
+    """嵌入模型状态响应"""
+
+    loaded: bool = Field(..., description="是否已加载")
+    cache_path: str | None = Field(None, description="缓存路径")
+    model: str | None = Field(None, description="模型名称")
+    dimension: int | None = Field(None, description="向量维度")
+    device: str | None = Field(None, description="计算设备")
     error: str | None = Field(None, description="错误信息")
 
 
@@ -266,6 +339,36 @@ async def get_settings() -> SettingsResponse:
                 max_tokens=config.model.max_tokens,
                 max_iterations=config.model.max_iterations,
             ),
+            main_agent=MainAgentConfigResponse(
+                provider=config.main_agent.provider or config.model.provider,
+                model=config.main_agent.model or config.model.model,
+                temperature=config.main_agent.temperature,
+                max_tokens=config.main_agent.max_tokens,
+                max_iterations=config.main_agent.max_iterations,
+                enabled=config.main_agent.enabled,
+                advanced_params=config.main_agent.advanced_params,
+            ),
+            sub_agent=SubAgentConfigResponse(
+                enabled=config.sub_agent.enabled,
+                provider=config.sub_agent.provider,
+                model=config.sub_agent.model,
+                max_concurrent=config.sub_agent.max_concurrent,
+                temperature=config.sub_agent.temperature,
+                max_tokens=config.sub_agent.max_tokens,
+            ),
+            enhanced_models=[
+                EnhancedModelConfigResponse(
+                    id=m.id,
+                    model_type=m.model_type,
+                    provider=m.provider,
+                    model=m.model,
+                    enabled=m.enabled,
+                    description=m.description,
+                    capabilities=m.capabilities,
+                    priority=m.priority,
+                )
+                for m in config.enhanced_models
+            ],
             workspace=WorkspaceConfigResponse(
                 path=config.workspace.path,
             ),
@@ -398,6 +501,85 @@ async def update_settings(request: UpdateSettingsRequest, req: Request) -> Setti
             if "per_session_max" in request.tool_history:
                 config.tool_history.per_session_max = request.tool_history["per_session_max"]
 
+        # 更新主 Agent 配置
+        if request.main_agent:
+            if "provider" in request.main_agent:
+                config.main_agent.provider = request.main_agent["provider"]
+
+            if "model" in request.main_agent:
+                config.main_agent.model = request.main_agent["model"]
+
+            if "temperature" in request.main_agent:
+                config.main_agent.temperature = request.main_agent["temperature"]
+
+            if "max_tokens" in request.main_agent:
+                config.main_agent.max_tokens = request.main_agent["max_tokens"]
+
+            if "max_iterations" in request.main_agent:
+                config.main_agent.max_iterations = request.main_agent["max_iterations"]
+
+            if "enabled" in request.main_agent:
+                config.main_agent.enabled = request.main_agent["enabled"]
+
+            if "advanced_params" in request.main_agent:
+                config.main_agent.advanced_params = request.main_agent["advanced_params"]
+
+            if "api_key" in request.main_agent:
+                config.main_agent.api_key = request.main_agent["api_key"]
+
+            if "api_base" in request.main_agent:
+                config.main_agent.api_base = request.main_agent["api_base"]
+
+        # 更新子 Agent 配置
+        if request.sub_agent:
+            if "enabled" in request.sub_agent:
+                config.sub_agent.enabled = request.sub_agent["enabled"]
+
+            if "provider" in request.sub_agent:
+                config.sub_agent.provider = request.sub_agent["provider"]
+
+            if "model" in request.sub_agent:
+                config.sub_agent.model = request.sub_agent["model"]
+
+            if "max_concurrent" in request.sub_agent:
+                config.sub_agent.max_concurrent = request.sub_agent["max_concurrent"]
+
+            if "temperature" in request.sub_agent:
+                config.sub_agent.temperature = request.sub_agent["temperature"]
+
+            if "max_tokens" in request.sub_agent:
+                config.sub_agent.max_tokens = request.sub_agent["max_tokens"]
+
+            if "api_key" in request.sub_agent:
+                config.sub_agent.api_key = request.sub_agent["api_key"]
+
+            if "api_base" in request.sub_agent:
+                config.sub_agent.api_base = request.sub_agent["api_base"]
+
+            if "advanced_params" in request.sub_agent:
+                config.sub_agent.advanced_params = request.sub_agent["advanced_params"]
+
+        # 更新增强模型配置
+        if request.enhanced_models is not None:
+            config.enhanced_models = [
+                EnhancedModelConfig(
+                    id=m.get("id", f"enhanced_{i}"),
+                    model_type=m.get("model_type", "custom"),
+                    provider=m.get("provider", ""),
+                    model=m.get("model", ""),
+                    enabled=m.get("enabled", True),
+                    description=m.get("description", ""),
+                    capabilities=m.get("capabilities", []),
+                    priority=m.get("priority", 0),
+                    temperature=m.get("temperature", 0.7),
+                    max_tokens=m.get("max_tokens", 4096),
+                    api_key=m.get("api_key"),
+                    api_base=m.get("api_base"),
+                    advanced_params=m.get("advanced_params", {}),
+                )
+                for i, m in enumerate(request.enhanced_models)
+            ]
+
         if request.persona:
             if "ai_name" in request.persona:
                 config.persona.ai_name = request.persona["ai_name"]
@@ -448,21 +630,21 @@ async def update_settings(request: UpdateSettingsRequest, req: Request) -> Setti
             # Provider 和模型配置变更
             if request.providers or request.model:
                 try:
-                    from backend.modules.providers.litellm_provider import LiteLLMProvider
+                    from backend.modules.providers.factory import create_provider
                     from backend.modules.providers.registry import get_provider_metadata
-                    
+
                     provider_id = config.model.provider
                     provider_config = config.providers.get(provider_id)
                     provider_meta = get_provider_metadata(provider_id)
-                    
+
                     api_key = provider_config.api_key if provider_config else None
                     api_base = (
                         provider_config.api_base
                         if provider_config and provider_config.api_base
                         else (provider_meta.default_api_base if provider_meta else None)
                     )
-                    
-                    new_provider = LiteLLMProvider(
+
+                    new_provider = create_provider(
                         api_key=api_key,
                         api_base=api_base,
                         default_model=config.model.model,
@@ -537,9 +719,9 @@ async def test_connection(request: TestConnectionRequest) -> TestConnectionRespo
     logger.info(f"Testing connection to {request.provider} with model {request.model}")
     
     try:
-        from backend.modules.providers.litellm_provider import LiteLLMProvider
+        from backend.modules.providers.factory import create_provider
         from backend.modules.providers.registry import get_provider_metadata
-        
+
         # 获取 provider 元数据
         provider_meta = get_provider_metadata(request.provider)
         if not provider_meta:
@@ -547,15 +729,16 @@ async def test_connection(request: TestConnectionRequest) -> TestConnectionRespo
                 success=False,
                 error=f"未知的 provider: {request.provider}",
             )
-        
+
         # 使用用户提供的配置
         test_model = request.model or "gpt-3.5-turbo"
-        test_api_base = request.api_base or provider_meta.default_api_base
-        
-        logger.info(f"Using {provider_meta.name}, model: {test_model}, base: {test_api_base}")
-        
+        # 只有当 api_base 为 None 时才使用默认值，空字符串表示用户明确要使用默认
+        test_api_base = request.api_base if request.api_base is not None else provider_meta.default_api_base
+
+        logger.info(f"Using {provider_meta.name}, model: {test_model}, base: {test_api_base}, requested_base: {request.api_base}")
+
         # 创建临时 provider
-        provider = LiteLLMProvider(
+        provider = create_provider(
             api_key=request.api_key,
             api_base=test_api_base,
             default_model=test_model,
@@ -625,24 +808,24 @@ async def test_connection(request: TestConnectionRequest) -> TestConnectionRespo
 async def reload_oss_config():
     """
     重新加载 OSS 配置（热重载，无需重启应用）
-    
+
     Returns:
         dict: 重载结果
     """
     try:
         from backend.modules.tools.image_uploader import init_oss_uploader, get_upload_manager
-        
+
         # 重新加载配置
         await config_loader.load()
-        
+
         # 获取 OSS 配置
         oss_config = None
         if hasattr(config_loader.config.channels, 'qq') and hasattr(config_loader.config.channels.qq, 'oss'):
             oss_config = config_loader.config.channels.qq.oss.model_dump()
-        
+
         # 重新初始化 OSS 上传器
         init_oss_uploader(oss_config)
-        
+
         manager = get_upload_manager()
         if manager.uploader:
             logger.info(f"OSS 配置已重新加载: {manager.uploader.bucket} ({manager.uploader.region})")
@@ -662,10 +845,123 @@ async def reload_oss_config():
                 "message": "OSS 配置已清除",
                 "config": None
             }
-    
+
     except Exception as e:
         logger.error(f"重新加载 OSS 配置失败: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"重新加载 OSS 配置失败: {str(e)}"
+        )
+
+
+@router.get("/embedder/status", response_model=EmbedderStatusResponse)
+async def get_embedder_status() -> EmbedderStatusResponse:
+    """
+    获取嵌入模型状态
+
+    Returns:
+        EmbedderStatusResponse: 嵌入模型状态信息
+    """
+    try:
+        config = config_loader.config
+        embedding_config = config.built_in.embedding
+
+        # Check if model cache exists
+        cache_dir = embedding_config.get_cache_dir() if hasattr(embedding_config, 'get_cache_dir') else None
+        model_path = None
+        if cache_dir:
+            from pathlib import Path
+            cache_path = Path(cache_dir)
+            if cache_path.exists():
+                model_path = str(cache_path)
+
+        return EmbedderStatusResponse(
+            loaded=False,  # Will be true after first use
+            cache_path=model_path,
+            model=embedding_config.model,
+            dimension=embedding_config.dimension,
+            device=embedding_config.device,
+            error=None
+        )
+
+    except Exception as e:
+        logger.exception(f"Failed to get embedder status: {e}")
+        return EmbedderStatusResponse(
+            loaded=False,
+            cache_path=None,
+            model=None,
+            dimension=None,
+            device=None,
+            error=str(e)
+        )
+
+
+@router.post("/embedder/test", response_model=TestEmbedderResponse)
+async def test_embedder_connection(request: TestEmbedderRequest) -> TestEmbedderResponse:
+    """
+    测试嵌入模型 API 连接
+
+    Args:
+        request: 测试嵌入模型请求
+
+    Returns:
+        TestEmbedderResponse: 测试结果
+    """
+    logger.info(f"Testing embedder connection: {request.provider}/{request.model}")
+
+    try:
+        import litellm
+
+        # Get API key from config
+        config = config_loader.config
+        api_key = None
+
+        if request.provider in config.providers:
+            api_key = config.providers[request.provider].api_key
+
+        if not api_key:
+            return TestEmbedderResponse(
+                success=False,
+                error=f"未配置 {request.provider} 的 API 密钥"
+            )
+
+        # Build API base URL
+        api_base = request.api_base
+        if not api_base:
+            from backend.modules.providers.registry import get_provider_metadata
+            provider_meta = get_provider_metadata(request.provider)
+            if provider_meta:
+                api_base = provider_meta.default_api_base
+
+        # Test embedding
+        model_str = f"openai/{request.model}" if request.provider not in ("azure",) else f"{request.provider}/{request.model}"
+
+        response = await litellm.aembedding(
+            model=model_str,
+            input=["Hello, world!"],
+            api_key=api_key,
+            api_base=api_base,
+        )
+
+        if response and response.data:
+            embedding = response.data[0]["embedding"]
+            dimension = len(embedding)
+
+            logger.info(f"Embedder test successful: dimension={dimension}")
+            return TestEmbedderResponse(
+                success=True,
+                message=f"连接成功，向量维度: {dimension}",
+                dimension=dimension
+            )
+        else:
+            return TestEmbedderResponse(
+                success=False,
+                error="未收到有效的嵌入响应"
+            )
+
+    except Exception as e:
+        logger.exception(f"Embedder test failed: {e}")
+        return TestEmbedderResponse(
+            success=False,
+            error=str(e)
         )

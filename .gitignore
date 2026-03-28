@@ -71,3 +71,22 @@ memory/vector_store.db
 # Vector memory database
 memory/*.db
 memory/vector_store.db
+
+# Generated media output
+generated_audio/
+generated_images/
+generated_video/
+generated_videos/
+
+# User uploads and workspace
+uploads/
+workspace/
+
+# Memory/knowledge local data
+memory/knowledge/
+
+# Provider backups
+backend/modules/providers_backup/
+
+# Misc scripts with potential secrets
+send_arxiv_email.py

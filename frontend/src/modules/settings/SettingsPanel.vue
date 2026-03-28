@@ -33,25 +33,22 @@
 
     <!-- 主内容区 -->
     <main class="main-content">
-      <!-- 标签页内容 -->
-      <div class="content-wrapper">
-        <!-- Provider Configuration -->
-        <transition name="fade" mode="out-in">
-          <div
-            v-if="activeTab === 'provider'"
-            key="provider"
-            class="tab-pane"
-          >
-            <ProviderConfig />
-          </div>
+      <!-- Loading state -->
+      <div v-if="settingsStore.loading" class="loading-state">
+        <div class="spinner"></div>
+        <p>{{ $t('common.loading') }}</p>
+      </div>
 
-          <!-- Model Parameters -->
+      <!-- 标签页内容 -->
+      <div v-else class="content-wrapper">
+        <transition name="fade" mode="out-in">
+          <!-- Models Configuration (Unified Panel) -->
           <div
-            v-else-if="activeTab === 'model'"
-            key="model"
+            v-if="activeTab === 'models'"
+            key="models"
             class="tab-pane"
           >
-            <ModelConfig />
+            <ModelsPanel />
           </div>
 
           <!-- Persona Configuration -->
@@ -146,8 +143,7 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  Server as ServerIcon,
-  Sliders as SlidersIcon,
+  Bot as BotIcon,
   User as UserIcon,
   FolderOpen as FolderIcon,
   Shield as ShieldIcon,
@@ -155,8 +151,7 @@ import {
   FileCode as FileCodeIcon
 } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
-import ProviderConfig from './ProviderConfig.vue'
-import ModelConfig from './ModelConfig.vue'
+import ModelsPanel from './ModelsPanel.vue'
 import PersonaConfig from './PersonaConfig.vue'
 import PersonalityEditor from './PersonalityEditor.vue'
 import WorkspaceConfig from './WorkspaceConfig.vue'
@@ -171,13 +166,12 @@ const { t } = useI18n()
 const settingsStore = useSettingsStore()
 const toast = useToast()
 
-const activeTab = ref<SettingsTab>('provider')
+const activeTab = ref<SettingsTab>('models')
 const personaSubTab = ref<'config' | 'editor'>('config')
 const sidebarCollapsed = ref(window.innerWidth < 768) // 小屏幕默认折叠
 
 const tabs = [
-  { id: 'provider' as SettingsTab, icon: ServerIcon, label: 'settings.tabs.provider', shortLabel: 'settings.tabShort.provider' },
-  { id: 'model' as SettingsTab, icon: SlidersIcon, label: 'settings.tabs.model', shortLabel: 'settings.tabShort.model' },
+  { id: 'models' as SettingsTab, icon: BotIcon, label: 'settings.tabs.models', shortLabel: 'settings.tabShort.models' },
   { id: 'persona' as SettingsTab, icon: UserIcon, label: 'settings.tabs.persona', shortLabel: 'settings.tabShort.persona' },
   { id: 'workspace' as SettingsTab, icon: FolderIcon, label: 'settings.tabs.workspace', shortLabel: 'settings.tabShort.workspace' },
   { id: 'security' as SettingsTab, icon: ShieldIcon, label: 'settings.tabs.security', shortLabel: 'settings.tabShort.security' },
@@ -357,6 +351,29 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.loading-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  color: var(--text-secondary);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .content-wrapper {

@@ -139,7 +139,8 @@ const config = ref<KnowledgeHubConfig>({
 const modes = [
   { value: 'direct', labelKey: 'knowledgeHub.directMode' },
   { value: 'llm', labelKey: 'knowledgeHub.llmMode' },
-  { value: 'hybrid', labelKey: 'knowledgeHub.hybridMode' }
+  { value: 'hybrid', labelKey: 'knowledgeHub.hybridMode' },
+  { value: 'graph', labelKey: 'knowledgeHub.graphMode' }
 ]
 
 const testQuery = ref('')

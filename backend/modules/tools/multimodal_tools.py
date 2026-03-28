@@ -1,6 +1,6 @@
-"""Multimodal generation tools - 图像生成、TTS 和视频理解工具
+"""Multimodal generation tools - 图像生成、TTS、视频理解和 MiniMax 多媒体工具
 
-提供 AI 图像生成、文本转语音和视频内容理解功能。
+提供 AI 图像生成、文本转语音、视频内容理解、音乐生成、视频生成、MiniMax TTS 功能。
 """
 
 import json
@@ -8,10 +8,25 @@ from typing import Any, Optional
 
 from loguru import logger
 
+from backend.utils.paths import WORKSPACE_DIR
 from backend.modules.output.image_generator import ImageGenerator
 from backend.modules.output.tts_provider import TTSProvider
 from backend.modules.output.video_understanding import VideoUnderstanding
+from backend.modules.output.minimax_music import MinimaxMusicProvider
+from backend.modules.output.minimax_video import MinimaxVideoProvider
+from backend.modules.output.minimax_tts import MinimaxTTSProvider
 from backend.modules.tools.base import Tool
+
+
+def _build_file_url(abs_path: str | None) -> str | None:
+    """将绝对路径转换为 /api/files/ 相对 URL"""
+    if not abs_path:
+        return None
+    workspace_str = str(WORKSPACE_DIR)
+    if abs_path.startswith(workspace_str):
+        relative = abs_path[len(workspace_str):].lstrip("/")
+        return f"/api/files/{relative}"
+    return None
 
 
 class GenerateImageTool(Tool):
@@ -128,7 +143,7 @@ class GenerateImageTool(Tool):
             return json.dumps({
                 "success": result.get("success", False),
                 "path": result.get("path"),
-                "url": None,
+                "url": _build_file_url(result.get("path")),
                 "error": None,
             })
 
@@ -237,7 +252,7 @@ class TextToSpeechTool(Tool):
             return json.dumps({
                 "success": result.get("success", False),
                 "path": result.get("path"),
-                "url": None,
+                "url": _build_file_url(result.get("path")),
                 "error": None,
             })
 
@@ -345,5 +360,275 @@ class UnderstandVideoTool(Tool):
                 "success": False,
                 "description": None,
                 "frames_analyzed": 0,
+                "error": str(e),
+            })
+
+
+class GenerateMusicTool(Tool):
+    """音乐生成工具 - 通过 MiniMax music-2.5 生成音乐"""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        api_base: str = "https://api.minimaxi.com/v1",
+        default_model: str = "music-2.5",
+    ):
+        self.provider = MinimaxMusicProvider(
+            api_key=api_key,
+            api_base=api_base,
+            default_model=default_model,
+        )
+        logger.debug(f"GenerateMusicTool initialized with model={default_model}")
+
+    @property
+    def name(self) -> str:
+        return "generate_music"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Generate music from text prompts. Describe the style, mood, instruments and tempo. "
+            "Optionally provide lyrics or request instrumental-only output."
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "Music description (style, mood, instruments, e.g. 'Mandopop, Festive, Upbeat')",
+                },
+                "lyrics": {
+                    "type": "string",
+                    "description": "Custom lyrics for the song (optional, with [Verse], [Chorus] tags)",
+                },
+                "instrumental": {
+                    "type": "boolean",
+                    "description": "Generate instrumental music only, no vocals (default: false)",
+                },
+            },
+            "required": ["prompt"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        prompt = kwargs.get("prompt", "")
+        if not prompt:
+            return json.dumps({
+                "success": False, "path": None, "url": None,
+                "error": "Prompt is required",
+            })
+
+        try:
+            result = await self.provider.generate(
+                prompt=prompt,
+                lyrics=kwargs.get("lyrics"),
+                instrumental=kwargs.get("instrumental", False),
+            )
+
+            return json.dumps({
+                "success": result.get("success", False),
+                "path": result.get("path"),
+                "url": _build_file_url(result.get("path")),
+                "error": result.get("error"),
+            })
+        except Exception as e:
+            logger.error(f"Music generation failed: {e}")
+            return json.dumps({
+                "success": False, "path": None, "url": None,
+                "error": str(e),
+            })
+
+
+class GenerateVideoTool(Tool):
+    """视频生成工具 - 通过 MiniMax Hailuo API 生成视频"""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        api_base: str = "https://api.minimaxi.com/v1",
+        default_model: str = "MiniMax-Hailuo-2.3",
+    ):
+        self.provider = MinimaxVideoProvider(
+            api_key=api_key,
+            api_base=api_base,
+            default_model=default_model,
+        )
+        logger.debug(f"GenerateVideoTool initialized with model={default_model}")
+
+    @property
+    def name(self) -> str:
+        return "generate_video"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Generate short videos from text prompts. Describe the scene, camera movement, and style. "
+            "Video generation takes 1-5 minutes. Supports text-to-video and image-to-video modes."
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "Video content description (scene, action, camera movement, style)",
+                },
+                "duration": {
+                    "type": "integer",
+                    "description": "Video duration in seconds",
+                    "enum": [5, 6, 10],
+                },
+                "resolution": {
+                    "type": "string",
+                    "description": "Video resolution",
+                    "enum": ["360P", "540P", "720P", "768P", "1080P"],
+                },
+                "first_frame_image": {
+                    "type": "string",
+                    "description": "URL of the first frame image (for image-to-video mode)",
+                },
+            },
+            "required": ["prompt"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        prompt = kwargs.get("prompt", "")
+        if not prompt:
+            return json.dumps({
+                "success": False, "path": None, "url": None,
+                "error": "Prompt is required",
+            })
+
+        try:
+            # Map standard resolutions to MiniMax supported resolutions
+            resolution = kwargs.get("resolution", "1080P")
+            if resolution in ["360P", "540P"]:
+                resolution = "768P"  # Map low resolutions to 768P
+            elif resolution == "720P":
+                resolution = "768P"  # Map 720P to 768P (MiniMax supported)
+            
+            result = await self.provider.generate(
+                prompt=prompt,
+                model=kwargs.get("model"),
+                first_frame_image=kwargs.get("first_frame_image"),
+                duration=kwargs.get("duration", 6),
+                resolution=resolution,
+            )
+
+            return json.dumps({
+                "success": result.get("success", False),
+                "path": result.get("path"),
+                "url": _build_file_url(result.get("path")),
+                "error": result.get("error"),
+            })
+        except Exception as e:
+            logger.error(f"Video generation failed: {e}")
+            return json.dumps({
+                "success": False, "path": None, "url": None,
+                "error": str(e),
+            })
+
+
+class MiniMaxTextToSpeechTool(Tool):
+    """MiniMax 语音合成工具 - 通过 MiniMax speech-2.8 异步 API"""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        api_base: str = "https://api.minimaxi.com/v1",
+        default_model: str = "speech-2.8",
+        default_voice: str = "male-qn-qingse",
+    ):
+        self.provider = MinimaxTTSProvider(
+            api_key=api_key,
+            api_base=api_base,
+            default_model=default_model,
+            default_voice=default_voice,
+        )
+        logger.debug(
+            f"MiniMaxTextToSpeechTool initialized with model={default_model}, voice={default_voice}"
+        )
+
+    @property
+    def name(self) -> str:
+        return "minimax_text_to_speech"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Convert text to speech using MiniMax speech models. "
+            "Supports 100+ voices in Chinese, English, Japanese, Korean and more. "
+            "Use voice parameter to select: "
+            "male-qn-qingse (青涩男), male-qn-jingying (精英男), female-shaonv (少女), "
+            "female-yujie (御姐), female-tianmei (甜美女)."
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "Text to convert to speech (max 100K characters)",
+                },
+                "voice": {
+                    "type": "string",
+                    "description": "Voice ID (e.g., male-qn-qingse, female-shaonv, audiobook_male_1)",
+                },
+                "speed": {
+                    "type": "number",
+                    "description": "Speech speed (0.5 - 2.0, default 1.0)",
+                    "minimum": 0.5,
+                    "maximum": 2.0,
+                },
+                "vol": {
+                    "type": "number",
+                    "description": "Volume (0.1 - 10, default 1.0)",
+                    "minimum": 0.1,
+                    "maximum": 10.0,
+                },
+                "pitch": {
+                    "type": "integer",
+                    "description": "Pitch adjustment (-12 to 12, default 0)",
+                    "minimum": -12,
+                    "maximum": 12,
+                },
+            },
+            "required": ["text"],
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        text = kwargs.get("text", "")
+        if not text:
+            return json.dumps({
+                "success": False, "path": None, "url": None,
+                "error": "Text is required",
+            })
+
+        try:
+            result = await self.provider.speak(
+                text=text,
+                model=kwargs.get("model"),
+                voice=kwargs.get("voice"),
+                speed=kwargs.get("speed", 1.0),
+                vol=kwargs.get("vol", 1.0),
+                pitch=kwargs.get("pitch", 0),
+            )
+
+            return json.dumps({
+                "success": result.get("success", False),
+                "path": result.get("path"),
+                "url": _build_file_url(result.get("path")),
+                "error": result.get("error"),
+            })
+        except Exception as e:
+            logger.error(f"MiniMax TTS failed: {e}")
+            return json.dumps({
+                "success": False, "path": None, "url": None,
                 "error": str(e),
             })

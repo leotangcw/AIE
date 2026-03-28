@@ -31,5 +31,6 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
     session: Mapped["Session"] = relationship("Session", back_populates="messages")
+    media: Mapped[list["MessageMedia"]] = relationship("MessageMedia", back_populates="message", cascade="all, delete-orphan")
 
     __table_args__ = (Index("idx_messages_session", "session_id", "created_at"),)

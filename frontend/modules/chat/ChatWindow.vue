@@ -363,7 +363,7 @@ import { useChatStore } from '@/store/chat'
 import { useToolsStore } from '@/store/tools'
 import { useToast } from '@/composables/useToast'
 import { useKeyboard, commonShortcuts } from '@/composables/useKeyboard'
-import { toolsAPI, authAPI } from '@/api/endpoints'
+import { toolsAPI, authAPI, uploadAPI } from '@/api/endpoints'
 
 // 导入停止 API
 import { stopAPI } from '@/api/endpoints'
@@ -1056,12 +1056,6 @@ const sendMessage = () => {
     textareaRef.value.style.height = 'auto'
   }
 
-  // 清除文件
-  if (selectedFiles.value.length > 0) {
-    fileSelectorRef.value?.clearFiles()
-    selectedFiles.value = []
-  }
-
   // 如果正在流式传输，将消息加入队列
   if (isStreaming.value) {
     pendingMessages.push(message)
@@ -1119,7 +1113,7 @@ function sendQueuedMessage(message: string) {
 }
 
 // 实际发送消息
-function doSendMessage(message: string) {
+async function doSendMessage(message: string) {
   // 添加用户消息（如果还没添加过，即非排队消息）
   const existingQueued = messages.value.find(
     m => m.role === 'user' && m.content === message && m.queued
@@ -1136,16 +1130,35 @@ function doSendMessage(message: string) {
     })
   }
 
+  // 上传附件并获取路径
+  let attachments: string[] = []
+  if (selectedFiles.value.length > 0) {
+    try {
+      for (const file of selectedFiles.value) {
+        const result = await uploadAPI.uploadFile(file)
+        attachments.push(result.path)
+      }
+      // 上传成功后清除文件选择器
+      fileSelectorRef.value?.clearFiles()
+      selectedFiles.value = []
+    } catch (error) {
+      console.error('[ChatWindow] 文件上传失败:', error)
+      toast.error('文件上传失败，请重试')
+      return
+    }
+  }
+
   const payload = {
     type: 'message',
     sessionId: chatStore.currentSessionId,
-    content: message
+    content: message,
+    attachments: attachments.length > 0 ? attachments : undefined
   }
-  
+
   try {
     ws!.send(JSON.stringify(payload))
     isStreaming.value = true
-    
+
     // 立即添加一个空的 assistant 消息作为占位，显示"思考中"状态
     const placeholderId = `assistant-${Date.now()}`
     messages.value.push({
@@ -1156,7 +1169,7 @@ function doSendMessage(message: string) {
       isThinking: true
     })
     currentStreamingMessage = messages.value[messages.value.length - 1]
-    
+
   } catch (error) {
     console.error('[ChatWindow] 发送消息失败:', error)
     toast.error('发送失败，请重试')

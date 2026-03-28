@@ -42,6 +42,12 @@
               />
               {{ $t('subtask.error') || '执行出错' }}
             </span>
+            <span v-else-if="status === 'sleeping'" class="status-sleeping">
+              后台执行中，等待心跳检查...
+            </span>
+            <span v-else-if="status === 'analyzing'" class="status-analyzing">
+              正在分析进展...
+            </span>
             <span v-else class="status-default">
               {{ description }}
             </span>
@@ -56,6 +62,9 @@
             <span v-if="isParallel" class="parallel-badge">
               {{ $t('subtask.parallel') || '并行' }}
             </span>
+          </div>
+          <div v-if="lastAnalysis" class="analysis-text">
+            {{ lastAnalysis }}
           </div>
         </div>
       </div>
@@ -82,13 +91,15 @@ import { computed } from 'vue'
 interface Props {
   taskId?: string
   description?: string
-  status?: 'starting' | 'tool_call' | 'tool_result' | 'completed' | 'error'
+  status?: 'starting' | 'tool_call' | 'tool_result' | 'completed' | 'error' | 'sleeping' | 'analyzing'
   toolName?: string
   toolCount?: number
   current?: number
   total?: number
   isParallel?: boolean
   message?: string
+  lastAnalysis?: string
+  progress?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -100,20 +111,21 @@ const props = withDefaults(defineProps<Props>(), {
   current: 0,
   total: 0,
   isParallel: false,
-  message: ''
+  message: '',
+  lastAnalysis: '',
+  progress: 0,
 })
 
 const visible = computed(() => {
-  return props.status !== 'completed' && props.status !== 'error'
+  return !['completed', 'error'].includes(props.status)
 })
 
 const showProgress = computed(() => {
-  return props.total > 0 && props.current >= 0
+  return props.progress > 0
 })
 
 const progressPercent = computed(() => {
-  if (!props.total || props.total === 0) return 0
-  return Math.min(100, Math.max(0, (props.current / props.total) * 100))
+  return Math.min(100, Math.max(0, props.progress))
 })
 
 const progressClass = computed(() => {
@@ -245,6 +257,25 @@ const progressClass = computed(() => {
   color: #EF4444;
 }
 
+.status-sleeping {
+  color: #94A3B8;
+}
+
+.status-analyzing {
+  color: #3B82F6;
+}
+
+.analysis-text {
+  font-size: 11px;
+  color: var(--text-secondary, #64748b);
+  margin-top: 4px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .progress-bar-container {
   height: 3px;
   background: rgba(59, 130, 246, 0.15);
@@ -306,5 +337,9 @@ const progressClass = computed(() => {
 :root[data-theme='dark'] .parallel-badge {
   color: #A78BFA;
   background: rgba(139, 92, 246, 0.2);
+}
+
+:root[data-theme='dark'] .status-sleeping {
+  color: #64748B;
 }
 </style>

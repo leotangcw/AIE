@@ -85,6 +85,7 @@ def _create_shared_components(config):
         model=config.model.model,
         temperature=config.model.temperature,
         max_tokens=config.model.max_tokens,
+        security_config=config.security,
     )
 
     logger.info("Preparing tool parameters...")
@@ -124,7 +125,7 @@ def _create_shared_components(config):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    from backend.database import init_db, get_db_session_factory
+    from backend.database import init_db, get_db_session_factory, AsyncSessionLocal
     from backend.modules.config.loader import config_loader
     from backend.modules.channels.manager import ChannelManager
     from backend.modules.messaging.enterprise_queue import EnterpriseMessageQueue
@@ -142,6 +143,40 @@ async def lifespan(app: FastAPI):
     logger.info("Starting AIE backend...")
     await init_db()
     logger.info("Database initialized")
+
+    # 自动迁移：为已存在的 task_items 表添加 monitoring_info 列
+    try:
+        from sqlalchemy import text
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("ALTER TABLE task_items ADD COLUMN monitoring_info TEXT"))
+            await db.commit()
+            logger.info("Migration: added monitoring_info column to task_items")
+    except Exception as e:
+        if "duplicate column name" in str(e).lower() or "already exists" in str(e).lower():
+            logger.debug("Migration: monitoring_info column already exists")
+        else:
+            logger.warning(f"Migration check for monitoring_info: {e}")
+
+    # 自动迁移：心跳分析字段
+    for col_name, col_type in [
+        ("last_analysis", "TEXT"),
+        ("analysis_history", "TEXT"),
+        ("next_check_at", "DATETIME"),
+        ("check_interval", "INTEGER DEFAULT 120"),
+        ("wake_count", "INTEGER DEFAULT 0"),
+        ("prev_progress", "INTEGER DEFAULT 0"),
+    ]:
+        try:
+            async with AsyncSessionLocal() as db:
+                await db.execute(text(f"ALTER TABLE task_items ADD COLUMN {col_name} {col_type}"))
+                await db.commit()
+                logger.info(f"Migration: added {col_name} column to task_items")
+        except Exception as e:
+            if "duplicate column name" in str(e).lower() or "already exists" in str(e).lower():
+                pass
+            else:
+                logger.warning(f"Migration check for {col_name}: {e}")
+
     await config_loader.load()
     logger.info("Configuration loaded")
     config = config_loader.config
@@ -163,6 +198,34 @@ async def lifespan(app: FastAPI):
     infrastructure = await init_infrastructure(config)
     shared["infrastructure"] = infrastructure
     logger.info("Infrastructure initialized")
+
+    # 初始化模型健康追踪器
+    from backend.modules.model_health import ModelHealthTracker
+    model_health_tracker = ModelHealthTracker()
+    main_model_name = config.model.model
+    sub_agent_cfg = config.sub_agent
+    sub_model_name = sub_agent_cfg.model if sub_agent_cfg.enabled and sub_agent_cfg.model else main_model_name
+    model_health_tracker.configure(main_model=main_model_name, sub_model=sub_model_name)
+    shared["model_health_tracker"] = model_health_tracker
+    logger.info(f"ModelHealthTracker initialized: main={main_model_name}, sub={sub_model_name}")
+
+    # 初始化心跳调度器
+    from backend.modules.agent.heartbeat_scheduler import HeartbeatScheduler
+    agent_heartbeat_scheduler = HeartbeatScheduler(
+        subagent_manager=shared["subagent_manager"],
+        provider=shared["provider"],
+        main_model=main_model_name,
+        sub_model=sub_model_name,
+        model_health_tracker=model_health_tracker,
+    )
+    shared["heartbeat_scheduler"] = agent_heartbeat_scheduler
+
+    # 恢复未完成的任务
+    await shared["subagent_manager"].recover_tasks()
+
+    # 启动心跳调度器
+    await agent_heartbeat_scheduler.start()
+    logger.info("HeartbeatScheduler started")
 
     # 注入 Embedder 到 VectorStore (可选功能)
     logger.info("Injecting Embedder into VectorStore...")
@@ -329,6 +392,7 @@ async def lifespan(app: FastAPI):
         session_manager=session_manager,
         channel_manager=channel_manager,
         heartbeat_service=heartbeat_service,
+        subagent_manager=shared["subagent_manager"],
     )
     logger.info("Cron executor created")
 
@@ -410,6 +474,11 @@ async def lifespan(app: FastAPI):
 
     # 正常关闭流程
     logger.info("Initiating graceful shutdown...")
+
+    # 停止心跳调度器
+    if "heartbeat_scheduler" in shared:
+        await shared["heartbeat_scheduler"].stop()
+        logger.info("Agent HeartbeatScheduler stopped")
 
     # 清理 ModelRegistry
     try:
@@ -515,6 +584,7 @@ from backend.api.agent_teams import router as agent_teams_router
 from backend.api.task_items import router as task_items_router
 from backend.api.heartbeat import router as heartbeat_router
 from backend.api.todo import router as todo_router
+from backend.api.model_health import router as model_health_router
 from backend.modules.knowledge_hub.api import router as knowledge_hub_router
 from backend.api.memory_vector import router as memory_vector_router
 from backend.api.upload import router as upload_router
@@ -551,6 +621,7 @@ app.include_router(upload_router)
 app.include_router(files_router)
 app.include_router(multimodal_router)
 app.include_router(graph_rag_router)
+app.include_router(model_health_router)
 
 
 # WebSocket 端点

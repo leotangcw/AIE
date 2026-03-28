@@ -15,8 +15,16 @@ class SimpleCache:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         self.config = config
-        self.ttl = config.ttl if config else 3600
-        self.max_items = config.max_memory_items if config else 100
+        # 支持字典或对象配置
+        if config is None:
+            self.ttl = 3600
+            self.max_items = 100
+        elif isinstance(config, dict):
+            self.ttl = config.get('ttl', 3600)
+            self.max_items = config.get('max_memory_items', 100)
+        else:
+            self.ttl = getattr(config, 'ttl', 3600)
+            self.max_items = getattr(config, 'max_memory_items', 100)
         self.max_file_items = 1000  # 文件缓存最大条目数
 
         self._memory = {}

@@ -206,7 +206,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Plus as PlusIcon,
-  FolderOpen as FolderOpenIcon
+  FolderOpen
 } from 'lucide-vue-next'
 import knowledgeApi, { type KnowledgeSource } from '@/api/knowledge'
 import knowledgeHubApi, { type KnowledgeHubConfig } from '@/api/knowledgeHub'
@@ -387,7 +387,8 @@ const config = ref<KnowledgeHubConfig>({
 const modes = [
   { value: 'direct', labelKey: 'knowledgeHub.directMode' },
   { value: 'llm', labelKey: 'knowledgeHub.llmMode' },
-  { value: 'hybrid', labelKey: 'knowledgeHub.hybridMode' }
+  { value: 'hybrid', labelKey: 'knowledgeHub.hybridMode' },
+  { value: 'graph', labelKey: 'knowledgeHub.graphMode' }
 ]
 
 const loadConfig = async () => {

@@ -1,5 +1,6 @@
 """任务看板模型 - 持久化任务项"""
 
+import json
 from datetime import datetime
 from enum import Enum
 from typing import Optional
@@ -84,6 +85,17 @@ class TaskItem(Base):
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
     max_retries: Mapped[int] = mapped_column(Integer, default=3)
 
+    # 后台进程监控信息 (JSON)
+    monitoring_info: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+
+    # 心跳分析相关
+    last_analysis: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    analysis_history: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    next_check_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    check_interval: Mapped[int] = mapped_column(Integer, default=120)
+    wake_count: Mapped[int] = mapped_column(Integer, default=0)
+    prev_progress: Mapped[int] = mapped_column(Integer, default=0)
+
     # 元数据
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -132,6 +144,13 @@ class TaskItem(Base):
             "error_message": self.error_message,
             "retry_count": self.retry_count,
             "max_retries": self.max_retries,
+            "monitoring_info": self.monitoring_info,
+            "last_analysis": self.last_analysis,
+            "analysis_history": json.loads(self.analysis_history) if self.analysis_history else [],
+            "next_check_at": self._utc_to_iso(self.next_check_at),
+            "check_interval": self.check_interval,
+            "wake_count": self.wake_count,
+            "prev_progress": self.prev_progress,
             "created_at": self._utc_to_iso(self.created_at),
             "updated_at": self._utc_to_iso(self.updated_at),
         }

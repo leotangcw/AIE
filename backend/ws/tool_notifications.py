@@ -299,6 +299,7 @@ async def notify_tool_execution(
     arguments: dict[str, Any],
     result: str | None = None,
     error: str | None = None,
+    duration_ms: int | None = None,
 ) -> None:
     """发送工具执行通知（便捷函数）
 
@@ -308,6 +309,7 @@ async def notify_tool_execution(
         arguments: 工具参数
         result: 执行结果（可选）
         error: 错误信息（可选）
+        duration_ms: 执行耗时毫秒（可选）
     """
     if error:
         # 发送错误通知
@@ -315,7 +317,7 @@ async def notify_tool_execution(
     elif result:
         # 发送调用和结果通知
         await send_tool_call(session_id, tool_name, arguments)
-        await send_tool_result(session_id, tool_name, result)
+        await send_tool_result(session_id, tool_name, result, duration=duration_ms)
     else:
         # 只发送调用通知
         await send_tool_call(session_id, tool_name, arguments)

@@ -201,7 +201,7 @@ class WorkflowEngine:
         record = self._mgr.get_task(task_id)
         if record is None:
             raise RuntimeError(f"Sub-agent task {task_id} disappeared unexpectedly")
-        if record.status.value == "failed":
+        if record.status == "failed":
             raise RuntimeError(record.error or "Sub-agent failed without error message")
         result = record.result or ""
 

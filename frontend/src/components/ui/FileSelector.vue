@@ -21,7 +21,7 @@
     >
       <slot>
         <component
-          :is="PaperclipIcon"
+          :is="UploadIcon"
           :size="size"
         />
       </slot>
@@ -91,7 +91,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Paperclip as PaperclipIcon, File as FileIcon, X as XIcon } from 'lucide-vue-next'
+import { Upload as UploadIcon, File as FileIcon, X as XIcon } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 
 interface Props {

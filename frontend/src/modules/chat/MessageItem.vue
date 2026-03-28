@@ -77,6 +77,15 @@
           :name="audioItem.name || `Audio ${index + 1}`"
         />
       </div>
+      <div class="video-players" v-if="message.video && message.video.length > 0">
+        <VideoPlayer
+          v-for="(videoItem, index) in message.video"
+          :key="index"
+          :src="videoItem.src"
+          :name="videoItem.name || `Video ${index + 1}`"
+          :poster="videoItem.poster"
+        />
+      </div>
       <div 
         v-else-if="message.role !== 'assistant' && message.content"
         class="message-content user-message-content"
@@ -160,6 +169,7 @@ import ToolCallCard from '@/components/chat/ToolCallCard.vue'
 import ReasoningBlock from '@/components/chat/ReasoningBlock.vue'
 import ImageGallery from '@/components/chat/ImageGallery.vue'
 import AudioPlayer from '@/components/chat/AudioPlayer.vue'
+import VideoPlayer from '@/components/chat/VideoPlayer.vue'
 
 interface ToolCall {
   id: string
@@ -186,6 +196,11 @@ interface Message {
   audio?: Array<{
     src: string
     name?: string
+  }>
+  video?: Array<{
+    src: string
+    name?: string
+    poster?: string
   }>
 }
 
@@ -559,6 +574,13 @@ onBeforeUnmount(() => {
 }
 
 .audio-players {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--spacing-sm) 0;
+}
+
+.video-players {
   display: flex;
   flex-direction: column;
   gap: 8px;

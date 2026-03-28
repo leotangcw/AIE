@@ -347,47 +347,13 @@ async def refresh_task_progress(
     task_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    使用模型主动检查任务真实进度
-
-    这个端点会让模型：
-    1. 分析任务类型和描述
-    2. 判断应该使用什么工具检查状态
-    3. 执行检查并更新任务状态
-    """
+    """获取任务当前状态（纯 DB 查询，不调用 LLM）"""
     from loguru import logger
 
     try:
-        # 获取任务
-        task = await db.get(TaskItem, task_id)
-        if not task:
-            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-
-        # 即使任务标记为 done，也应该检查真实状态
-        # 因为可能是假阳性（后台进程还在运行）
-
-        # 获取 provider 和 workspace
-        from backend.app import app
-
-        shared = app.state.shared
-        provider = shared.get("provider")
-        workspace = shared.get("workspace")
-
-        if not provider:
-            raise HTTPException(status_code=500, detail="Provider not available")
-
-        if not workspace:
-            from pathlib import Path
-            workspace = Path(".").expanduser().resolve()
-
-        # 调用模型检查任务状态
+        # 调用纯 DB 查询
         from backend.modules.agent.task_board import TaskBoardService
-        result = await TaskBoardService.refresh_task_progress(
-            provider=provider,
-            workspace=workspace,
-            task_id=task_id,
-        )
-
+        result = await TaskBoardService.refresh_task_progress(task_id)
         return result
 
     except HTTPException:

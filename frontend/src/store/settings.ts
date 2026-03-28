@@ -20,6 +20,46 @@ export interface ModelConfig {
     max_iterations: number
 }
 
+export interface MainAgentConfig {
+    provider: string
+    model: string
+    temperature: number
+    max_tokens: number
+    max_iterations: number
+    enabled: boolean
+    advanced_params: Record<string, any>
+    api_key?: string
+    api_base?: string
+}
+
+export interface SubAgentConfig {
+    enabled: boolean
+    provider: string
+    model: string
+    max_concurrent: number
+    temperature: number
+    max_tokens: number
+    api_key?: string
+    api_base?: string
+    advanced_params: Record<string, any>
+}
+
+export interface EnhancedModelConfig {
+    id: string
+    model_type: string
+    provider: string
+    model: string
+    enabled: boolean
+    description: string
+    capabilities: string[]
+    priority: number
+    temperature?: number
+    max_tokens?: number
+    api_key?: string
+    api_base?: string
+    advanced_params?: Record<string, any>
+}
+
 export interface WorkspaceConfig {
     path: string
 }
@@ -61,6 +101,11 @@ export const useSettingsStore = defineStore('settings', () => {
         error.value = null
         try {
             const response = await settingsAPI.get()
+            console.log('[SettingsStore] Loaded settings:', response)
+            console.log('[SettingsStore] Providers:', response.providers)
+            console.log('[SettingsStore] Model provider:', response.model?.provider)
+            console.log('[SettingsStore] Enhanced models:', response.enhanced_models)
+            console.log('[SettingsStore] Sub agent:', response.sub_agent)
             settings.value = response
         } catch (err: any) {
             error.value = err.message || 'Failed to load settings'
@@ -128,6 +173,57 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     /**
+     * 更新主 Agent 配置
+     */
+    function updateMainAgent(config: Partial<MainAgentConfig>) {
+        if (settings.value && settings.value.main_agent) {
+            settings.value.main_agent = { ...settings.value.main_agent, ...config }
+        }
+    }
+
+    /**
+     * 更新子 Agent 配置
+     */
+    function updateSubAgent(config: Partial<SubAgentConfig>) {
+        if (settings.value && settings.value.sub_agent) {
+            settings.value.sub_agent = { ...settings.value.sub_agent, ...config }
+        }
+    }
+
+    /**
+     * 更新增强模型列表
+     */
+    function updateEnhancedModels(models: EnhancedModelConfig[]) {
+        if (settings.value) {
+            settings.value.enhanced_models = models
+        }
+    }
+
+    /**
+     * 添加增强模型
+     */
+    function addEnhancedModel(model: EnhancedModelConfig) {
+        if (settings.value) {
+            if (!settings.value.enhanced_models) {
+                settings.value.enhanced_models = []
+            }
+            settings.value.enhanced_models.push(model)
+        }
+    }
+
+    /**
+     * 删除增强模型
+     */
+    function removeEnhancedModel(modelId: string) {
+        if (settings.value && settings.value.enhanced_models) {
+            const index = settings.value.enhanced_models.findIndex(m => m.id === modelId)
+            if (index >= 0) {
+                settings.value.enhanced_models.splice(index, 1)
+            }
+        }
+    }
+
+    /**
      * 更新工作空间配置
      */
     function updateWorkspace(config: WorkspaceConfig) {
@@ -161,6 +257,11 @@ export const useSettingsStore = defineStore('settings', () => {
         testConnection,
         updateProvider,
         updateModel,
+        updateMainAgent,
+        updateSubAgent,
+        updateEnhancedModels,
+        addEnhancedModel,
+        removeEnhancedModel,
         updateWorkspace,
         updateSecurity
     }

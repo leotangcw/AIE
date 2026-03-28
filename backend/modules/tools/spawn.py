@@ -36,7 +36,7 @@ class SpawnTool(Tool):
         return (
             "Spawn background agent for complex or time-consuming tasks. "
             "Use when task requires multiple steps, tools, or takes significant time. "
-            "Supports different agent types: general, explore, research, debug, review, build."
+            "Supports different agent types: general, explore, research, debug, review, build, long_running."
         )
 
     @property
@@ -54,8 +54,8 @@ class SpawnTool(Tool):
                 },
                 "type": {
                     "type": "string",
-                    "description": "Agent type: general, explore, research, debug, review, build (optional)",
-                    "enum": ["general", "explore", "research", "debug", "review", "build"],
+                    "description": "Agent type: general, explore, research, debug, review, build, long_running (optional)",
+                    "enum": ["general", "explore", "research", "debug", "review", "build", "long_running"],
                 },
                 "timeout": {
                     "type": "integer",

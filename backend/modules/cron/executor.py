@@ -32,12 +32,14 @@ class CronExecutor:
         session_manager: SessionManager,
         channel_manager: Optional[ChannelManager] = None,
         heartbeat_service=None,
+        subagent_manager=None,
     ):
         self.agent = agent
         self.bus = bus
         self.session_manager = session_manager
         self.channel_manager = channel_manager
         self.heartbeat_service = heartbeat_service
+        self.subagent_manager = subagent_manager
 
     async def execute(
         self,
@@ -141,11 +143,14 @@ class CronExecutor:
         try:
             from backend.modules.agent.task_board import run_task_heartbeat
 
-            result = await run_task_heartbeat()
+            result = await run_task_heartbeat(
+                subagent_manager=self.subagent_manager
+            )
 
             warnings = result.get("scan_result", {}).get("warnings", [])
             timeouts = result.get("scan_result", {}).get("timeouts", [])
             long_waiting = result.get("long_waiting", [])
+            process_results = result.get("process_monitoring", [])
 
             if warnings:
                 logger.info(f"[TaskHeartbeat] {len(warnings)} tasks running slow")
@@ -153,6 +158,8 @@ class CronExecutor:
                 logger.warning(f"[TaskHeartbeat] {len(timeouts)} tasks timed out")
             if long_waiting:
                 logger.info(f"[TaskHeartbeat] {len(long_waiting)} tasks long waiting")
+            if process_results:
+                logger.info(f"[TaskHeartbeat] {len(process_results)} background processes checked")
 
             # 返回简要结果
             summary_parts = []
@@ -162,6 +169,8 @@ class CronExecutor:
                 summary_parts.append(f"{len(timeouts)} timeouts")
             if long_waiting:
                 summary_parts.append(f"{len(long_waiting)} long waiting")
+            if process_results:
+                summary_parts.append(f"{len(process_results)} processes checked")
 
             return f"Task heartbeat: {', '.join(summary_parts)}" if summary_parts else "Task heartbeat: OK"
 

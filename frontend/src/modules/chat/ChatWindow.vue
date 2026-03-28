@@ -457,6 +457,7 @@ import HeartbeatWidget from '@/modules/heartbeat/HeartbeatWidget.vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/store/chat'
 import { useToolsStore } from '@/store/tools'
+import { useTaskStore } from '@/store/tasks'
 import { useToast } from '@/composables/useToast'
 import { useKeyboard, commonShortcuts } from '@/composables/useKeyboard'
 import { toolsAPI, authAPI, todoAPI } from '@/api/endpoints'
@@ -476,6 +477,7 @@ const KnowledgeSearchIcon = {
 
 const { t } = useI18n()
 const chatStore = useChatStore()
+const taskStore = useTaskStore()
 const toolsStore = useToolsStore()
 const toast = useToast()
 
@@ -747,6 +749,7 @@ function connectWebSocket(sessionId: string) {
               messages.value[index].content = message.content || ''
               messages.value[index].images = message.images || []
               messages.value[index].audio = message.audio || []
+              messages.value[index].video = message.video || []
               currentStreamingMessage = messages.value[index]
             }
           } else {
@@ -758,7 +761,8 @@ function connectWebSocket(sessionId: string) {
               timestamp: new Date(),
               toolCalls: [],
               images: message.images || [],
-              audio: message.audio || []
+              audio: message.audio || [],
+              video: message.video || []
             }
             messages.value.push(newMessage)
             currentStreamingMessage = newMessage
@@ -858,6 +862,35 @@ function connectWebSocket(sessionId: string) {
             }
           }
         }
+      } else if (message.type === 'media_generated') {
+        // 多媒体生成结果 - 添加到当前流式消息
+        if (currentStreamingMessage) {
+          const index = messages.value.findIndex(m => m.id === currentStreamingMessage.id)
+          if (index !== -1) {
+            const mediaType = message.media_type
+            if (mediaType === 'image') {
+              if (!messages.value[index].images) messages.value[index].images = []
+              messages.value[index].images.push({
+                src: message.src,
+                alt: message.alt || message.name,
+                caption: message.name
+              })
+            } else if (mediaType === 'audio') {
+              if (!messages.value[index].audio) messages.value[index].audio = []
+              messages.value[index].audio.push({
+                src: message.src,
+                name: message.name
+              })
+            } else if (mediaType === 'video') {
+              if (!messages.value[index].video) messages.value[index].video = []
+              messages.value[index].video.push({
+                src: message.src,
+                name: message.name
+              })
+            }
+            messages.value = [...messages.value]
+          }
+        }
       } else if (message.type === 'message_complete') {
         currentStreamingMessage = null
         isStreaming.value = false
@@ -884,6 +917,32 @@ function connectWebSocket(sessionId: string) {
             updatedAt: t.updatedAt || ''
           }))
         }
+      } else if (message.type === 'task_created') {
+        // 后台任务创建
+        taskStore.addTask(message.task_id, message.label)
+      } else if (message.type === 'task_progress') {
+        // 后台任务进度更新
+        taskStore.updateTaskProgress(message.task_id, message.progress, message.message)
+      } else if (message.type === 'task_complete') {
+        // 后台任务完成
+        taskStore.completeTask(message.task_id, message.result)
+      } else if (message.type === 'task_failed') {
+        // 后台任务失败
+        taskStore.failTask(message.task_id, message.error)
+      } else if (message.type === 'task_status') {
+        // 后台任务状态更新
+        taskStore.updateTaskStatus(message.task_id, message.status, message.progress)
+      } else if (message.type === 'task_analysis') {
+        // task_analysis: 心跳分析结果
+        taskStore.updateTaskAnalysis(message.task_id, {
+          progress: message.progress,
+          summary: message.summary,
+          elapsed_minutes: message.elapsed_minutes,
+          wake_count: message.wake_count,
+        })
+      } else if (message.type === 'model_status') {
+        // model_status: 模型健康状态变化
+        taskStore.updateModelStatus(message.models)
       } else if (message.type === 'subtask.updated') {
         // Subtask 进度更新
         currentSubtask.value = {
@@ -1050,7 +1109,21 @@ async function loadSessionMessages(sessionId: string) {
           error: tc.error,
           status: tc.status || (tc.error ? 'error' : 'success'),
           duration: tc.duration
-        })) || []
+        })) || [],
+        // 从持久化媒体恢复 images/audio/video
+        images: (m.media || []).filter((item: any) => item.media_type === 'image').map((item: any) => ({
+          src: item.src,
+          alt: item.alt,
+          caption: item.alt
+        })),
+        audio: (m.media || []).filter((item: any) => item.media_type === 'audio').map((item: any) => ({
+          src: item.src,
+          name: item.name
+        })),
+        video: (m.media || []).filter((item: any) => item.media_type === 'video').map((item: any) => ({
+          src: item.src,
+          name: item.name
+        })),
       }))
       
       // 将工具调用历史关联到消息

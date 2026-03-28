@@ -4,7 +4,7 @@ from backend.modules.agent.context import ContextBuilder
 from backend.modules.agent.loop import AgentLoop
 from backend.modules.agent.memory import MemoryStore
 from backend.modules.agent.skills import Skill, SkillsLoader
-from backend.modules.agent.subagent import SubagentManager, SubagentTask, TaskStatus
+from backend.modules.agent.subagent import SubagentManager, SubagentTask
 
 __all__ = [
     "AgentLoop",
@@ -14,5 +14,4 @@ __all__ = [
     "SkillsLoader",
     "SubagentManager",
     "SubagentTask",
-    "TaskStatus",
 ]

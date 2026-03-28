@@ -157,7 +157,7 @@ let refreshInterval: number | null = null
 
 onMounted(() => {
   loadData()
-  refreshInterval = window.setInterval(loadData, 30000) // Refresh every 30s
+  refreshInterval = window.setInterval(loadData, 60000) // Refresh every 60s
 })
 
 onUnmounted(() => {

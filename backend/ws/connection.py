@@ -237,6 +237,19 @@ class ProcessingStartedMessage(ServerMessage):
     sessionId: str = Field(..., description="会话 ID")
 
 
+class MediaGeneratedMessage(ServerMessage):
+    """多媒体生成结果通知"""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: str = Field(default="media_generated", description="消息类型")
+    media_type: str = Field(..., description="媒体类型: image, audio, video")
+    src: str = Field(..., description="可访问的 URL 路径，如 /api/files/generated_images/xxx.png")
+    name: str = Field("", description="文件名称")
+    alt: str = Field("", description="描述文本")
+    tool_name: str = Field("", description="产生此媒体的工具名称")
+
+
 class MessageCompleteIdless(ServerMessage):
     """消息完成通知（无需 messageId）"""
 
@@ -592,4 +605,25 @@ async def send_error(session_id: str, message: str, code: str | None = None) -> 
     """
     return await connection_manager.send_to_session(
         session_id, ErrorMessage(message=message, code=code)
+    )
+
+
+async def send_media_generated(session_id: str, media_type: str, src: str, name: str = "", alt: str = "", tool_name: str = "") -> int:
+    """发送多媒体生成结果通知到会话
+
+    Args:
+        session_id: 会话 ID
+        media_type: 媒体类型 (image, audio, video)
+        src: 可访问的 URL 路径
+        name: 文件名称
+        alt: 描述文本
+        tool_name: 产生此媒体的工具名称
+
+    Returns:
+        int: 成功发送的连接数
+    """
+    return await connection_manager.send_to_session(
+        session_id, MediaGeneratedMessage(
+            media_type=media_type, src=src, name=name, alt=alt, tool_name=tool_name
+        )
     )

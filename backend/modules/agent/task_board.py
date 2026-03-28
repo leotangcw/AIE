@@ -1,8 +1,6 @@
 """任务看板服务 - 提供任务创建、更新、查询功能"""
 
 import uuid
-import json
-import re
 from datetime import datetime
 from typing import Optional
 
@@ -155,6 +153,44 @@ class TaskBoardService:
         await self.db.commit()
         await self.db.refresh(task)
         return task
+
+    async def update_monitoring_info(self, task_id: str, info_json: str):
+        """更新任务的监控信息"""
+        task = await self.get_task(task_id)
+        if not task:
+            return
+
+        task.monitoring_info = info_json
+        task.updated_at = datetime.utcnow()
+        await self.db.commit()
+
+    async def update_analysis(
+        self,
+        task_id: str,
+        progress: int,
+        last_analysis: str,
+        analysis_history: list[dict],
+        next_check_at,
+        prev_progress: int,
+        wake_count: int,
+    ):
+        """更新心跳分析结果"""
+        import json
+        result = await self.db.execute(
+            select(TaskItem).where(TaskItem.id == task_id)
+        )
+        task = result.scalar_one_or_none()
+        if not task:
+            return
+
+        task.prev_progress = prev_progress
+        task.progress = progress
+        task.last_analysis = last_analysis
+        task.analysis_history = json.dumps(analysis_history, ensure_ascii=False)
+        task.next_check_at = next_check_at
+        task.wake_count = wake_count
+        task.updated_at = datetime.utcnow()
+        await self.db.commit()
 
     async def start_task(self, task_id: str) -> Optional[TaskItem]:
         """开始任务"""
@@ -318,27 +354,19 @@ class TaskBoardService:
     # =========================================================================
 
     @staticmethod
-    async def refresh_task_progress(provider, workspace, task_id: str) -> dict:
+    async def refresh_task_progress(task_id: str) -> dict:
         """
-        使用模型主动检查任务真实进度
-
-        这是一个独立的监控函数，会:
-        1. 获取任务信息
-        2. 让模型判断如何检查任务状态
-        3. 根据模型的工具调用结果更新任务状态
+        获取任务当前状态（纯 DB 查询，不再调用 LLM）
 
         Returns:
             dict: {
                 "task_id": str,
-                "status": str,  # running/done/failed
-                "progress": int,  # 0-100
-                "description": str,  # 更新后的描述（包含进度信息）
+                "status": str,
+                "progress": int,
+                "description": str,
                 "error_message": str | None,
             }
         """
-        from datetime import datetime
-        from pathlib import Path
-
         async with AsyncSessionLocal() as db:
             service = TaskBoardService(db)
             task = await service.get_task(task_id)
@@ -346,166 +374,13 @@ class TaskBoardService:
             if not task:
                 return {"error": "Task not found"}
 
-            # 构建任务检查提示词
-            task_info = f"""你需要检查以下任务的真实状态：
-
-任务信息：
-- 任务ID: {task.id}
-- 任务名称: {task.title}
-- 任务描述: {task.description or '无'}
-- 任务类型: {task.task_type}
-- 开始时间: {task.started_at.isoformat() if task.started_at else '未知'}
-- 预估时长: {task.estimated_duration}秒 (如果知道)
-- 当前状态: {task.status}
-
-请使用适当的工具检查这个任务的真实状态：
-1. 如果是下载任务 → 使用 ls、du 检查文件大小和数量
-2. 如果是进程任务 → 使用 ps 检查进程是否还在运行
-3. 如果是其他任务 → 根据任务描述判断应该检查什么
-
-检查后返回：
-- 任务是否还在运行
-- 任务进度百分比（如果可以估算）
-- 任何有用的状态信息
-
-只返回JSON格式，不要其他内容："""
-
-            # 创建临时上下文让模型检查
-            try:
-                # 简单的LLM调用来检查任务状态
-                from backend.modules.tools.registry import ToolRegistry
-                from backend.modules.tools.filesystem import ListDirTool
-                from backend.modules.tools.shell import ExecTool
-
-                # 准备工具 - allow_dangerous=True 允许执行命令
-                tools = ToolRegistry()
-                tools.register(ListDirTool(workspace))
-                tools.register(ExecTool(
-                    workspace=workspace,
-                    timeout=60,
-                    allow_dangerous=True,
-                    restrict_to_workspace=True,
-                ))
-
-                # 构建消息
-                messages = [
-                    {"role": "system", "content": "你是一个任务状态检查助手，负责检查后台任务的真实进度。"},
-                    {"role": "user", "content": task_info}
-                ]
-
-                # 调用模型
-                tool_definitions = tools.get_definitions()
-
-                response_chunks = []
-                tool_calls_buffer = []
-
-                async for chunk in provider.chat_stream(
-                    messages=messages,
-                    tools=tool_definitions,
-                    model=provider.default_model,
-                    temperature=0.3,
-                    max_tokens=2000,
-                ):
-                    if chunk.is_content and chunk.content:
-                        response_chunks.append(chunk.content)
-                    if chunk.is_tool_call and chunk.tool_call:
-                        tool_calls_buffer.append(chunk.tool_call)
-
-                # 处理工具调用
-                for tool_call in tool_calls_buffer:
-                    result = await tools.execute(
-                        tool_name=tool_call.name,
-                        arguments=tool_call.arguments
-                    )
-                    messages.append({
-                        "role": "assistant",
-                        "tool_calls": [{
-                            "id": tool_call.id,
-                            "type": "function",
-                            "function": {
-                                "name": tool_call.name,
-                                "arguments": json.dumps(tool_call.arguments),
-                            },
-                        }],
-                        "content": "".join(response_chunks) if response_chunks else ""
-                    })
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "name": tool_call.name,
-                        "content": result,
-                    })
-
-                # 再次调用获取最终判断
-                messages.append({
-                    "role": "user",
-                    "content": "基于以上检查结果，返回最终的任务状态判断。只需要返回JSON格式：{\"status\": \"running/done/failed\", \"progress\": 0-100, \"description\": \"进度描述\"}"
-                })
-
-                final_response = []
-                async for chunk in provider.chat_stream(
-                    messages=messages,
-                    model=provider.default_model,
-                    temperature=0.1,
-                    max_tokens=500,
-                ):
-                    if chunk.is_content and chunk.content:
-                        final_response.append(chunk.content)
-
-                final_text = "".join(final_response)
-
-                # 解析JSON响应
-                try:
-                    # 尝试提取JSON
-                    json_match = re.search(r'\{[^}]+\}', final_text, re.DOTALL)
-                    if json_match:
-                        result = json.loads(json_match.group())
-
-                        # 获取模型判断的状态
-                        new_status = result.get("status", "running")
-
-                        # 更新任务状态 - 即使数据库是done，也要根据真实状态更新
-                        # 如果模型判断还在运行，就改回running
-                        if new_status == "running":
-                            task.status = TaskStatus.RUNNING.value
-                            # 清除完成时间
-                            task.completed_at = None
-                        elif new_status == "done":
-                            task.status = TaskStatus.DONE.value
-                            if not task.completed_at:
-                                task.completed_at = datetime.utcnow()
-                        elif new_status == "failed":
-                            task.status = TaskStatus.FAILED.value
-                            if not task.completed_at:
-                                task.completed_at = datetime.utcnow()
-
-                        # 更新进度
-                        if result.get("progress"):
-                            task.progress = min(100, max(0, result["progress"]))
-
-                        # 更新描述 - 追加进度信息
-                        if result.get("description"):
-                            # 避免重复追加
-                            if f"[进度更新:" not in (task.description or ""):
-                                task.description = (task.description or "") + f"\n\n[进度更新: {result['description']}]"
-
-                        await db.commit()
-                        await db.refresh(task)
-
-                        return {
-                            "task_id": task.id,
-                            "status": task.status,
-                            "progress": task.progress,
-                            "description": result.get("description", ""),
-                        }
-                except Exception as e:
-                    logger.warning(f"Failed to parse model response: {e}, response: {final_text}")
-
-                return {"error": "Failed to parse model response", "raw": final_text}
-
-            except Exception as e:
-                logger.exception(f"Error refreshing task {task_id}: {e}")
-                return {"error": str(e)}
+            return {
+                "task_id": task.id,
+                "status": task.status,
+                "progress": task.progress,
+                "description": task.description or "",
+                "error_message": task.error_message,
+            }
 
     @staticmethod
     async def quick_create_system_task(
@@ -535,6 +410,7 @@ class TaskHeartbeatService:
     TIMEOUT_MULTIPLIER_WARNING = 1.5   # 超过预估时长1.5倍 → 警告
     TIMEOUT_MULTIPLIER_FAILED = 3.0     # 超过预估时长3倍 → 标记失败
     LONG_WAITING_THRESHOLD = 1800       # 30分钟无进展 → 长时间等待
+    STUCK_FAILED_THRESHOLD = 3600       # 60分钟无进展 → 标记卡死/失败
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -557,8 +433,12 @@ class TaskHeartbeatService:
             if not task.started_at:
                 continue
 
+            estimated = task.estimated_duration
+            # 跳过无时间限制的任务（如 long_running 类型，estimated_duration=0）
+            if not estimated or estimated == 0:
+                continue
+
             elapsed = (now - task.started_at).total_seconds()
-            estimated = task.estimated_duration or 300  # 默认5分钟
 
             # 检测超时
             if elapsed > estimated * self.TIMEOUT_MULTIPLIER_FAILED:
@@ -589,11 +469,12 @@ class TaskHeartbeatService:
         }
 
     async def check_long_waiting_tasks(self) -> list:
-        """检测长时间等待（无进展）的任务"""
+        """检测长时间等待（无进展）的任务，超时标记为卡死"""
         from datetime import timedelta
 
         # 使用 timedelta 计算阈值时间
         threshold_time = datetime.utcnow() - timedelta(seconds=self.LONG_WAITING_THRESHOLD)
+        stuck_threshold_time = datetime.utcnow() - timedelta(seconds=self.STUCK_FAILED_THRESHOLD)
 
         result = await self.db.execute(
             select(TaskItem)
@@ -604,18 +485,39 @@ class TaskHeartbeatService:
 
         long_waiting = []
         now = datetime.utcnow()
+        stuck_count = 0
 
         for task in tasks:
             if not task.updated_at:
                 continue
 
             idle_seconds = (now - task.updated_at).total_seconds()
-            if idle_seconds > self.LONG_WAITING_THRESHOLD:
+            if idle_seconds > self.STUCK_FAILED_THRESHOLD:
+                # 超过卡死阈值 → 标记为失败
+                task.status = TaskStatus.FAILED.value
+                task.error_message = f"任务卡死（无进展 {idle_seconds/60:.0f} 分钟）"
+                task.completed_at = now
+                if task.started_at:
+                    task.actual_duration = int(
+                        (task.completed_at - task.started_at).total_seconds())
+                stuck_count += 1
+                logger.warning(f"[TaskHeartbeat] Task {task.id} stuck for {idle_seconds/60:.0f}min, marked as failed")
                 long_waiting.append({
                     "task_id": task.id,
                     "title": task.title,
                     "idle_seconds": int(idle_seconds),
+                    "stuck": True,
                 })
+            elif idle_seconds > self.LONG_WAITING_THRESHOLD:
+                long_waiting.append({
+                    "task_id": task.id,
+                    "title": task.title,
+                    "idle_seconds": int(idle_seconds),
+                    "stuck": False,
+                })
+
+        if stuck_count > 0:
+            await self.db.commit()
 
         return long_waiting
 
@@ -641,12 +543,198 @@ class TaskHeartbeatService:
 
         return len(tasks)
 
+    async def monitor_background_processes(self, subagent_manager) -> list:
+        """检查所有运行中任务的后台进程状态"""
+        import os
+
+        results = []
+        if not subagent_manager:
+            return results
+
+        for task in subagent_manager.tasks.values():
+            if task.status != "running" or not task.monitoring_info:
+                continue
+
+            pid = task.monitoring_info.get("pid")
+            if not pid:
+                continue
+
+            # 检查进程是否存活（通过 waitpid 获取退出码）
+            exit_code = None
+            alive = True
+            try:
+                pid_result = os.waitpid(pid, os.WNOHANG)
+                if pid_result[0] == 0:  # 进程已退出
+                    exit_code = os.WEXITSTATUS(pid_result[1])
+                    alive = False
+            except ChildProcessError:
+                alive = False
+            except OSError:
+                # PID 不存在或无权限
+                alive = False
+
+            # 更新 TaskBoard
+            if task.task_board_item_id:
+                task_item = await self.db.execute(
+                    select(TaskItem).where(TaskItem.id == task.task_board_item_id)
+                )
+                task_item = task_item.scalar_one_or_none()
+                if task_item:
+                    if alive:
+                        # 进程仍在运行
+                        task_item.updated_at = datetime.utcnow()
+
+                        # 基于日志文件大小变化检测卡死
+                        log_file = task.monitoring_info.get("log_file")
+                        stuck = False
+                        if log_file and os.path.exists(log_file):
+                            try:
+                                current_size = os.path.getsize(log_file)
+                                last_size = task.monitoring_info.get("last_size", 0)
+                                task.monitoring_info["last_size"] = current_size
+
+                                if last_size > 0 and current_size == last_size:
+                                    no_change = task.monitoring_info.get("no_change_count", 0) + 1
+                                    task.monitoring_info["no_change_count"] = no_change
+
+                                    if no_change >= 6:  # 30分钟 (5分钟间隔 × 6次)
+                                        stuck = True
+                                        task_item.status = TaskStatus.FAILED.value
+                                        task_item.error_message = (
+                                            f"后台进程卡死（日志文件30分钟无变化, 大小={current_size}字节）"
+                                        )
+                                        task.status = "failed"
+                                        task.error = "后台进程卡死"
+                                        logger.warning(
+                                            f"[TaskHeartbeat] Task {task.task_id} "
+                                            f"stuck: log unchanged for 30min"
+                                        )
+                                    else:
+                                        task.monitoring_info["no_change_count"] = 0
+                                else:
+                                    task.monitoring_info["no_change_count"] = 0
+                            except OSError:
+                                pass
+
+                        if not stuck:
+                            # 估算进度（基于目标目录文件数或日志产出）
+                            progress = self._estimate_progress_from_log(
+                                task.monitoring_info
+                            )
+                            if progress is not None:
+                                task_item.progress = min(99, progress)
+                            results.append({
+                                "task_id": task.task_id,
+                                "status": "running",
+                                "pid": pid,
+                                "progress": progress,
+                            })
+                    else:
+                        # 进程已退出，基于退出码判断成败
+                        now = datetime.utcnow()
+                        success = self._check_process_result(
+                            task.monitoring_info.get("log_file"),
+                            exit_code,
+                        )
+                        if success:
+                            task_item.status = TaskStatus.DONE.value
+                            task_item.progress = 100
+                            task.status = "done"
+                            task.progress = 100
+                        else:
+                            task_item.status = TaskStatus.FAILED.value
+                            task_item.error_message = (
+                                f"后台进程退出 (exit_code={exit_code})"
+                            )
+                            task.status = "failed"
+                            task.error = task_item.error_message
+                        task_item.completed_at = now
+                        if task_item.started_at:
+                            task_item.actual_duration = int(
+                                (task_item.completed_at - task_item.started_at).total_seconds())
+                        results.append({
+                            "task_id": task.task_id,
+                            "status": task.status,
+                            "pid": pid,
+                            "exit_code": exit_code,
+                        })
+                        logger.info(
+                            f"[TaskHeartbeat] Background process {pid} "
+                            f"finished: {task.status}, exit_code={exit_code}"
+                        )
+
+                    # 同步更新 monitoring_info 到 DB（含卡死检测状态）
+                    try:
+                        task_item.monitoring_info = json.dumps(task.monitoring_info)
+                    except Exception:
+                        pass
+
+        await self.db.commit()
+        return results
+
+    @staticmethod
+    def _estimate_progress_from_log(monitoring_info: dict) -> int | None:
+        """从目标目录文件数或日志文件估算进度"""
+        import os
+
+        if not monitoring_info:
+            return None
+
+        # 策略1: 基于目标目录中的文件数估算
+        target_dir = monitoring_info.get("target_dir")
+        if target_dir and os.path.isdir(target_dir):
+            try:
+                file_count = 0
+                for entry in os.listdir(target_dir):
+                    fp = os.path.join(target_dir, entry)
+                    if os.path.isfile(fp):
+                        file_count += 1
+                if file_count > 0:
+                    # 根据文件数给粗略进度（假设大模型有 20+ 文件）
+                    return min(95, file_count * 5)
+            except OSError:
+                pass
+
+        # 策略2: 日志文件有实际输出（进程在产出的最低信号）
+        log_file = monitoring_info.get("log_file")
+        if log_file and os.path.exists(log_file):
+            try:
+                size = os.path.getsize(log_file)
+                if size > 100:
+                    return 5  # 有进展但不精确
+            except OSError:
+                pass
+
+        return None
+
+    @staticmethod
+    def _check_process_result(log_file: str = None, exit_code: int = None) -> bool:
+        """检查进程退出结果，优先使用退出码"""
+        # 退出码 0 = 成功
+        if exit_code is not None:
+            return exit_code == 0
+
+        # 无法获取退出码时，回退到日志内容分析
+        if not log_file or not os.path.exists(log_file):
+            return False
+        try:
+            with open(log_file, 'r', errors='replace') as f:
+                content = f.read()[-2000:]
+            error_indicators = [
+                "Error", "ERROR", "FAILED", "Exception",
+                "Traceback", "Permission denied",
+            ]
+            errors = sum(1 for e in error_indicators if e in content)
+            return errors < 2  # 少量错误不算失败（降低误判率）
+        except Exception:
+            return False
+
 
 # =========================================================================
 # 便捷函数
 # =========================================================================
 
-async def run_task_heartbeat():
+async def run_task_heartbeat(subagent_manager=None):
     """运行任务心跳检测 - 供 Cron 调用"""
     async with AsyncSessionLocal() as db:
         service = TaskHeartbeatService(db)
@@ -654,7 +742,12 @@ async def run_task_heartbeat():
         # 扫描超时任务
         scan_result = await service.scan_running_tasks()
 
-        # 检测长时间等待
+        # 监控后台进程
+        process_results = []
+        if subagent_manager:
+            process_results = await service.monitor_background_processes(subagent_manager)
+
+        # 检测长时间等待（含卡死处理）
         long_waiting = await service.check_long_waiting_tasks()
 
         # 清理已完成任务
@@ -662,6 +755,7 @@ async def run_task_heartbeat():
 
         return {
             "scan_result": scan_result,
+            "process_monitoring": process_results,
             "long_waiting": long_waiting,
             "archived": archived_count,
         }

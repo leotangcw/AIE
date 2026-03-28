@@ -6,15 +6,14 @@
 """
 
 import asyncio
-import base64
-import os
-import platform
+import json
 from pathlib import Path
 from typing import Any, Literal
 
 from loguru import logger
 
 from backend.modules.tools.base import Tool
+from backend.modules.tools.multimodal_tools import _build_file_url
 
 
 class ScreenshotTool(Tool):
@@ -131,14 +130,24 @@ class ScreenshotTool(Tool):
         mode = kwargs.get("mode", "")
         
         if not mode:
-            return "Error: mode parameter is required (desktop or webpage)"
-        
+            return json.dumps({
+                "success": False,
+                "path": None,
+                "url": None,
+                "error": "mode parameter is required (desktop or webpage)",
+            })
+
         if mode == "desktop":
             return await self._capture_desktop(**kwargs)
         elif mode == "webpage":
             return await self._capture_webpage(**kwargs)
         else:
-            return f"Error: Invalid mode '{mode}'. Must be 'desktop' or 'webpage'"
+            return json.dumps({
+                "success": False,
+                "path": None,
+                "url": None,
+                "error": f"Invalid mode '{mode}'. Must be 'desktop' or 'webpage'",
+            })
 
     async def _capture_desktop(self, **kwargs: Any) -> str:
         """
@@ -156,10 +165,12 @@ class ScreenshotTool(Tool):
             import mss
             import mss.tools
         except ImportError:
-            return (
-                "Error: mss library not installed. "
-                "Install it with: pip install mss"
-            )
+            return json.dumps({
+                "success": False,
+                "path": None,
+                "url": None,
+                "error": "mss library not installed. Install it with: pip install mss",
+            })
         
         monitor_num = kwargs.get("monitor", 0)
         output_path = kwargs.get("output_path")
@@ -170,10 +181,12 @@ class ScreenshotTool(Tool):
                 monitors = sct.monitors
                 
                 if monitor_num < 0 or monitor_num >= len(monitors):
-                    return (
-                        f"Error: Invalid monitor number {monitor_num}. "
-                        f"Available monitors: 0-{len(monitors) - 1}"
-                    )
+                    return json.dumps({
+                        "success": False,
+                        "path": None,
+                        "url": None,
+                        "error": f"Invalid monitor number {monitor_num}. Available: 0-{len(monitors) - 1}",
+                    })
                 
                 # 选择显示器（0 表示所有显示器）
                 monitor = monitors[monitor_num]
@@ -205,18 +218,25 @@ class ScreenshotTool(Tool):
                 file_size = full_path.stat().st_size
                 
                 logger.info(f"桌面截图已保存: {output_path} ({file_size} bytes)")
-                
-                return (
-                    f"Desktop screenshot captured successfully!\n"
-                    f"Path: {output_path}\n"
-                    f"Size: {screenshot.width}x{screenshot.height}\n"
-                    f"File size: {file_size:,} bytes\n"
-                    f"Monitor: {monitor_num}"
-                )
-                
+
+                return json.dumps({
+                    "success": True,
+                    "path": str(full_path),
+                    "url": _build_file_url(str(full_path)),
+                    "size": f"{screenshot.width}x{screenshot.height}",
+                    "file_size": file_size,
+                    "monitor": monitor_num,
+                    "error": None,
+                })
+
         except Exception as e:
             logger.error(f"桌面截图失败: {e}")
-            return f"Error capturing desktop screenshot: {str(e)}"
+            return json.dumps({
+                "success": False,
+                "path": None,
+                "url": None,
+                "error": str(e),
+            })
 
     async def _capture_webpage(self, **kwargs: Any) -> str:
         """
@@ -233,10 +253,12 @@ class ScreenshotTool(Tool):
         try:
             from playwright.async_api import async_playwright
         except ImportError:
-            return (
-                "Error: playwright library not installed. "
-                "Install it with: pip install playwright && playwright install chromium"
-            )
+            return json.dumps({
+                "success": False,
+                "path": None,
+                "url": None,
+                "error": "playwright library not installed. Install it with: pip install playwright && playwright install chromium",
+            })
         
         url = kwargs.get("url", "")
         output_path = kwargs.get("output_path")
@@ -247,11 +269,21 @@ class ScreenshotTool(Tool):
         timeout = kwargs.get("timeout", 30000)
         
         if not url:
-            return "Error: url parameter is required for webpage mode"
-        
+            return json.dumps({
+                "success": False,
+                "path": None,
+                "url": None,
+                "error": "url parameter is required for webpage mode",
+            })
+
         # 验证 URL
         if not url.startswith(("http://", "https://")):
-            return f"Error: Invalid URL '{url}'. Must start with http:// or https://"
+            return json.dumps({
+                "success": False,
+                "path": None,
+                "url": None,
+                "error": f"Invalid URL '{url}'. Must start with http:// or https://",
+            })
         
         try:
             logger.info(f"捕获网页截图: url={url}, full_page={full_page}")
@@ -303,17 +335,24 @@ class ScreenshotTool(Tool):
                 file_size = full_path.stat().st_size
                 
                 logger.info(f"网页截图已保存: {output_path} ({file_size} bytes)")
-                
-                return (
-                    f"Webpage screenshot captured successfully!\n"
-                    f"URL: {url}\n"
-                    f"Title: {page_title}\n"
-                    f"Path: {output_path}\n"
-                    f"Viewport: {viewport_width}x{viewport_height}\n"
-                    f"Full page: {full_page}\n"
-                    f"File size: {file_size:,} bytes"
-                )
-                
+
+                return json.dumps({
+                    "success": True,
+                    "path": str(full_path),
+                    "url": _build_file_url(str(full_path)),
+                    "url_source": url,
+                    "title": page_title,
+                    "viewport": f"{viewport_width}x{viewport_height}",
+                    "full_page": full_page,
+                    "file_size": file_size,
+                    "error": None,
+                })
+
         except Exception as e:
             logger.error(f"网页截图失败: {e}")
-            return f"Error capturing webpage screenshot: {str(e)}"
+            return json.dumps({
+                "success": False,
+                "path": None,
+                "url": None,
+                "error": str(e),
+            })

@@ -37,6 +37,11 @@ export interface Message {
         src: string
         name?: string
     }>
+    video?: Array<{
+        src: string
+        name?: string
+        poster?: string
+    }>
 }
 
 export const useChatStore = defineStore('chat', () => {

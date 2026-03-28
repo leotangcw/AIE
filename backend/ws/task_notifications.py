@@ -78,6 +78,17 @@ class TaskLogMessage(ServerMessage):
     timestamp: float
 
 
+class TaskAnalysisMessage(ServerMessage):
+    """心跳分析结果消息 - 由 HeartbeatScheduler 推送"""
+
+    type: str = "task_analysis"
+    task_id: str
+    progress: int  # 0-100
+    summary: str = ""
+    elapsed_minutes: int = 0
+    wake_count: int = 0
+
+
 class SubtaskUpdateMessage(ServerMessage):
     """子任务进度更新消息 (用于 ChatPanel 的 SubtaskProgress 组件)"""
 
@@ -92,6 +103,22 @@ class SubtaskUpdateMessage(ServerMessage):
     is_parallel: bool = False
     message: str = ""
     session_id: str = ""
+
+
+class TaskAnalysisMessage(ServerMessage):
+    """心跳分析结果推送"""
+    type: str = "task_analysis"
+    task_id: str
+    progress: int
+    summary: str
+    elapsed_minutes: int
+    wake_count: int = 0
+
+
+class ModelStatusMessage(ServerMessage):
+    """模型健康状态变化"""
+    type: str = "model_status"
+    models: dict = {}
 
 
 # ============================================================================

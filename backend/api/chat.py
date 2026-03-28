@@ -19,7 +19,7 @@ from backend.modules.agent.loop import AgentLoop
 from backend.modules.agent.memory import MemoryStore
 from backend.modules.agent.skills import SkillsLoader
 from backend.modules.config.loader import config_loader
-from backend.modules.providers.litellm_provider import LiteLLMProvider
+from backend.modules.providers.factory import create_provider
 from backend.modules.session.manager import SessionManager
 from backend.modules.session.runtime_config import get_session_model_override
 from backend.modules.tools.registry import ToolRegistry
@@ -86,6 +86,17 @@ class ToolCallResponse(BaseModel):
     duration: int | None = None
 
 
+class MediaResponse(BaseModel):
+    """媒体响应"""
+
+    id: int
+    media_type: str
+    src: str
+    name: str | None = None
+    alt: str | None = None
+    tool_name: str | None = None
+
+
 class MessageResponse(BaseModel):
     """消息响应"""
 
@@ -95,6 +106,7 @@ class MessageResponse(BaseModel):
     content: str
     created_at: str
     tool_calls: list[ToolCallResponse] = Field(default_factory=list, description="工具调用记录")
+    media: list[MediaResponse] = Field(default_factory=list, description="关联媒体")
 
 
 # ============================================================================
@@ -147,7 +159,7 @@ async def get_agent_loop(db: AsyncSession = Depends(get_db)) -> AgentLoop:
             else (provider_meta.default_api_base if provider_meta else None)
         )
         
-        provider = LiteLLMProvider(
+        provider = create_provider(
             api_key=api_key,
             api_base=api_base,
             default_model=config.model.model,
@@ -487,6 +499,12 @@ async def send_message(
                         content=assistant_content,
                     )
 
+                    # 持久化本轮生成的媒体到 message_media 表
+                    try:
+                        await agent_loop._persist_media(assistant_message.id)
+                    except Exception as media_err:
+                        logger.warning(f"Failed to persist media (non-fatal): {media_err}")
+
                     # 回填 message_id 到该会话的未关联工具调用记录
                     try:
                         conversation_history = get_conversation_history()
@@ -736,9 +754,10 @@ async def get_session_messages(
     try:
         from sqlalchemy import select
         from backend.models.tool_conversation import ToolConversation
-        
+        from backend.models.message_media import MessageMedia
+
         session_manager = SessionManager(db)
-        
+
         # 验证会话是否存在
         session = await session_manager.get_session(session_id)
         if session is None:
@@ -746,22 +765,22 @@ async def get_session_messages(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Session '{session_id}' not found"
             )
-        
+
         # 获取消息
         messages = await session_manager.get_messages(
             session_id=session_id,
             limit=limit,
             offset=offset,
         )
-        
+
         # 获取该会话的所有工具调用记录
         tool_calls_query = select(ToolConversation).where(
             ToolConversation.session_id == session_id
         ).order_by(ToolConversation.timestamp.asc())
-        
+
         tool_calls_result = await db.execute(tool_calls_query)
         all_tool_calls = tool_calls_result.scalars().all()
-        
+
         # 按 message_id 分组工具调用
         tool_calls_by_message: dict[int, list[ToolConversation]] = {}
         for tc in all_tool_calls:
@@ -769,6 +788,21 @@ async def get_session_messages(
                 if tc.message_id not in tool_calls_by_message:
                     tool_calls_by_message[tc.message_id] = []
                 tool_calls_by_message[tc.message_id].append(tc)
+
+        # 获取该会话的所有媒体记录
+        media_query = select(MessageMedia).where(
+            MessageMedia.message_id.in_([m.id for m in messages])
+        ).order_by(MessageMedia.id.asc())
+
+        media_result = await db.execute(media_query)
+        all_media = media_result.scalars().all()
+
+        # 按 message_id 分组媒体
+        media_by_message: dict[int, list[MessageMedia]] = {}
+        for mm in all_media:
+            if mm.message_id not in media_by_message:
+                media_by_message[mm.message_id] = []
+            media_by_message[mm.message_id].append(mm)
         
         # 构建响应，包含工具调用
         response_messages = []
@@ -809,6 +843,17 @@ async def get_session_messages(
                     content=msg.content,
                     created_at=msg.created_at.isoformat(),
                     tool_calls=tool_call_responses,
+                    media=[
+                        MediaResponse(
+                            id=mm.id,
+                            media_type=mm.media_type,
+                            src=mm.src,
+                            name=mm.name,
+                            alt=mm.alt,
+                            tool_name=mm.tool_name,
+                        )
+                        for mm in media_by_message.get(msg.id, [])
+                    ],
                 )
             )
         

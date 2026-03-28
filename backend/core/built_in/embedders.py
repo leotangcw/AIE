@@ -6,6 +6,7 @@ import asyncio
 import os
 import threading
 import numpy as np
+from pathlib import Path
 from typing import Optional, Any
 from loguru import logger
 
@@ -48,6 +49,41 @@ class UnifiedEmbedder:
         logger.info(f"API embedder configured: {instance._api_client['provider']}/{instance._api_client['model']}")
         return instance
 
+    def _check_model_cached(self, model_name: str, cache_dir: str) -> bool:
+        """检查模型是否已缓存"""
+        # HuggingFace 缓存结构: cache_dir/models--org--model_name/
+        safe_model_name = model_name.replace("/", "--")
+        model_cache_path = Path(cache_dir) / f"models--{safe_model_name}"
+
+        if not model_cache_path.exists():
+            return False
+
+        # 检查是否有 snapshots 目录且有内容
+        snapshots_dir = model_cache_path / "snapshots"
+        if not snapshots_dir.exists():
+            return False
+
+        # 检查是否有有效的快照
+        snapshots = list(snapshots_dir.iterdir())
+        if not snapshots:
+            return False
+
+        # 检查是否有必要的模型文件
+        for snapshot in snapshots:
+            if snapshot.is_dir():
+                # 检查是否有模型文件（可能是指向 blobs 的符号链接）
+                has_model = (
+                    (snapshot / "model.safetensors").exists() or
+                    (snapshot / "pytorch_model.bin").exists() or
+                    (snapshot / "model.onnx").exists()
+                )
+                has_config = (snapshot / "config.json").exists()
+                if has_model and has_config:
+                    logger.info(f"Model {model_name} found in cache: {snapshot}")
+                    return True
+
+        return False
+
     async def _load_local_model(self, config):
         """加载 BGE-M3 本地模型（线程安全）"""
         # Double-check pattern for thread safety
@@ -58,19 +94,33 @@ class UnifiedEmbedder:
             if self._local_model is not None:
                 return
 
-            # 设置缓存目录（关键：避免每次重新下载）
+            # 获取缓存目录
             cache_dir = config.get_cache_dir() if hasattr(config, 'get_cache_dir') else getattr(config, 'cache_dir', None)
-            if cache_dir:
-                os.environ["HF_HOME"] = cache_dir
-                os.environ["TRANSFORMERS_CACHE"] = cache_dir
-                os.environ["SENTENCE_TRANSFORMERS_HOME"] = cache_dir
-                logger.info(f"Model cache directory set: {cache_dir}")
+            if not cache_dir:
+                from backend.utils.paths import get_data_dir
+                cache_path = get_data_dir() / "model_cache"
+                cache_path.mkdir(parents=True, exist_ok=True)
+                cache_dir = str(cache_path)
+
+            # 在任何导入之前设置环境变量
+            os.environ["HF_HOME"] = cache_dir
+            os.environ["HF_HUB_CACHE"] = cache_dir
+            os.environ["TRANSFORMERS_CACHE"] = cache_dir
+            os.environ["SENTENCE_TRANSFORMERS_HOME"] = cache_dir
+            logger.info(f"Model cache directory set: {cache_dir}")
 
             # 设置 ModelScope 镜像（国内加速）
             if config.use_modelscope:
                 endpoint = config.modelscope_endpoint or "https://hf-mirror.com"
                 os.environ["HF_ENDPOINT"] = endpoint
-                logger.debug(f"HF mirror set: {endpoint}")
+                logger.info(f"HF mirror set: {endpoint}")
+
+            # 检查模型是否已缓存
+            model_cached = self._check_model_cached(config.model, cache_dir)
+            if model_cached:
+                logger.info(f"Loading model from cache: {config.model}")
+            else:
+                logger.info(f"Model not in cache, will download: {config.model}")
 
             # 尝试 FlagEmbedding
             try:
@@ -84,7 +134,7 @@ class UnifiedEmbedder:
                         config.model,
                         use_fp16=config.use_fp16,
                         device=device,
-                        cache_dir=cache_dir,  # 添加缓存目录
+                        cache_dir=cache_dir,
                     )
 
                 self._local_model = await asyncio.to_thread(load_bge_model)
@@ -105,7 +155,7 @@ class UnifiedEmbedder:
                     return SentenceTransformer(
                         config.model,
                         device=device,
-                        cache_folder=cache_dir,  # 添加缓存目录
+                        cache_folder=cache_dir,
                     )
 
                 self._local_model = await asyncio.to_thread(load_st_model)

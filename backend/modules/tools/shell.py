@@ -29,6 +29,9 @@ DANGEROUS_PATTERNS = [
     r"\b(shutdown|reboot|poweroff|halt)\b",
     r":\(\)\s*\{.*\};\s*:",
     r"\binit\s+[06]\b",
+    r"\b(pkill|killall)\b",  # 防止终止自身或其他进程
+    r"\bkill\s+-9?\b",      # 防止 kill 命令
+    r"\bsystemctl\s+(stop|kill|restart)\s+",  # 防止停止关键服务
 ]
 
 

@@ -29,11 +29,16 @@ class ToolRegistry:
     def set_session_id(self, session_id: str | None) -> None:
         """设置当前会话 ID，并更新需要 session_id 的工具"""
         self._session_id = session_id
-        
+
         # 更新 send_media 工具的 session_id
         send_media_tool = self._tools.get('send_media')
         if send_media_tool and hasattr(send_media_tool, 'set_session_id'):
             send_media_tool.set_session_id(session_id)
+
+        # 更新 display_media 工具的 session_id
+        display_media_tool = self._tools.get('display_media')
+        if display_media_tool and hasattr(display_media_tool, 'set_session_id'):
+            display_media_tool.set_session_id(session_id)
 
     def set_channel(self, channel: str | None) -> None:
         """设置当前消息来源渠道（如 dingtalk, telegram, web-chat）"""

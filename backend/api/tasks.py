@@ -79,20 +79,8 @@ async def list_tasks(
     try:
         manager = get_subagent_manager()
         
-        # 解析状态过滤
-        from backend.modules.agent.subagent import TaskStatus
-        status_enum = None
-        if status_filter:
-            try:
-                status_enum = TaskStatus(status_filter)
-            except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid status: {status_filter}"
-                )
-        
-        # 获取任务列表
-        tasks = manager.list_tasks(status=status_enum, session_id=session_id)
+        # 获取任务列表（status_filter 直接传递字符串）
+        tasks = manager.list_tasks(status=status_filter, session_id=session_id)
         
         # 转换为响应模型
         return [
@@ -101,7 +89,7 @@ async def list_tasks(
                 label=task.label,
                 message=task.message,
                 session_id=task.session_id,
-                status=task.status.value,
+                status=task.status,
                 progress=task.progress,
                 result=task.result,
                 error=task.error,
@@ -175,7 +163,7 @@ async def get_task(task_id: str) -> TaskResponse:
             label=task.label,
             message=task.message,
             session_id=task.session_id,
-            status=task.status.value,
+            status=task.status,
             progress=task.progress,
             result=task.result,
             error=task.error,

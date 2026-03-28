@@ -22,7 +22,7 @@ from backend.modules.channels.base import InboundMessage, OutboundMessage
 from backend.modules.config.loader import config_loader
 from backend.modules.messaging.enterprise_queue import EnterpriseMessageQueue
 from backend.modules.messaging.rate_limiter import RateLimiter
-from backend.modules.providers.litellm_provider import LiteLLMProvider
+from backend.modules.providers.base import LLMProvider
 from backend.modules.session.runtime_config import get_session_model_override
 from backend.modules.tools.setup import register_all_tools
 
@@ -58,7 +58,7 @@ class ChannelMessageHandler:
 
     def __init__(
         self,
-        provider: LiteLLMProvider,
+        provider: LLMProvider,
         workspace: Path,
         model: str,
         bus: EnterpriseMessageQueue,

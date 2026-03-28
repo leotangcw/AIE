@@ -42,6 +42,13 @@ class AgentLoop:
         self.temperature = temperature
         self.max_tokens = max_tokens
 
+        # 获取 display_media 工具的 _pending_media 引用（用于持久化）
+        self._pending_media: list[dict] = []
+        if tools:
+            dm_tool = tools.get_tool('display_media')
+            if dm_tool and hasattr(dm_tool, '_pending_media') and dm_tool._pending_media is not None:
+                self._pending_media = dm_tool._pending_media
+
         logger.debug(
             f"AgentLoop initialized: workspace={workspace}, "
             f"max_iterations={max_iterations}, max_retries={max_retries}, "
@@ -55,7 +62,7 @@ class AgentLoop:
         """解析当前消息执行应使用的 provider 和模型参数。
 
         支持会话级模型覆盖：当 model_override 指定了不同的 api_key 或 api_base 时，
-        会创建一个新的 LiteLLMProvider 实例。
+        会创建一个新的 Provider 实例。
 
         Args:
             model_override: 可选的模型覆盖参数，来自 SessionRuntimeConfig
@@ -106,9 +113,9 @@ class AgentLoop:
 
         if needs_new_provider:
             try:
-                from backend.modules.providers.litellm_provider import LiteLLMProvider
+                from backend.modules.providers.factory import create_provider
 
-                candidate_provider = LiteLLMProvider(
+                candidate_provider = create_provider(
                     api_key=override_api_key,
                     api_base=override_api_base,
                     default_model=candidate_model,
@@ -117,7 +124,7 @@ class AgentLoop:
                     provider_id=override_provider,
                 )
                 logger.info(
-                    f"Created new LiteLLMProvider for session override: "
+                    f"Created new provider for session override: "
                     f"provider={override_provider}, model={candidate_model}"
                 )
             except Exception as exc:
@@ -174,6 +181,9 @@ class AgentLoop:
         """
         logger.info(f"Processing message for session {session_id}: {message[:50]}...")
 
+        # 清空上一轮的 pending media（防止跨消息泄漏）
+        self._pending_media.clear()
+
         # 解析执行时配置（支持会话级模型覆盖）
         runtime_provider, runtime_model, runtime_temperature, runtime_max_tokens, runtime_max_iterations = (
             self._resolve_execution_runtime(model_override)
@@ -219,6 +229,16 @@ class AgentLoop:
                     if supplement:
                         yield f"\n\n[任务被中断]{supplement}"
                     return
+
+                # 检查已完成的后台任务（每 3 次迭代检查一次，避免过于频繁）
+                if iteration % 3 == 1 and self.subagent_manager:
+                    completed = self.subagent_manager.get_completed_undelivered_tasks(session_id)
+                    for t in completed:
+                        messages.append({
+                            "role": "system",
+                            "content": f"[后台任务完成] {t.label}: {t.result or '(无结果)'}\n请使用 check_task 获取详情并用 display_media 展示给用户。"
+                        })
+                        t._result_delivered = True
 
                 logger.debug(
                     f"Agent iteration {iteration}/{runtime_max_iterations}, total tool calls: {total_tool_calls}"
@@ -390,9 +410,47 @@ class AgentLoop:
                                     tool_name=tool_name,
                                     arguments=tool_args,
                                     result=result,
+                                    duration_ms=duration_ms,
                                 )
                             except Exception as e:
                                 logger.warning(f"Failed to send tool result notification: {e}")
+
+                            # 检查是否是多媒体工具结果，自动推送
+                            try:
+                                MULTIMEDIA_TOOLS = {
+                                    "generate_image": "image",
+                                    "text_to_speech": "audio",
+                                    "minimax_text_to_speech": "audio",
+                                    "generate_music": "audio",
+                                    "generate_video": "video",
+                                    "screenshot": "image",
+                                }
+                                if tool_name in MULTIMEDIA_TOOLS and result:
+                                    result_data = json.loads(result)
+                                    if result_data.get("success") and result_data.get("path"):
+                                        media_type = MULTIMEDIA_TOOLS[tool_name]
+                                        abs_path = result_data["path"]
+                                        from backend.modules.tools.multimodal_tools import _build_file_url
+                                        src = _build_file_url(abs_path) or abs_path
+                                        from backend.ws.connection import send_media_generated
+                                        await send_media_generated(
+                                            session_id=session_id,
+                                            media_type=media_type,
+                                            src=src,
+                                            name=Path(abs_path).name,
+                                            alt=f"{tool_name} 生成",
+                                            tool_name=tool_name,
+                                        )
+                                        # 追加到 _pending_media 用于持久化
+                                        self._pending_media.append({
+                                            "media_type": media_type,
+                                            "src": src,
+                                            "name": Path(abs_path).name,
+                                            "alt": f"{tool_name} 生成",
+                                            "tool_name": tool_name,
+                                        })
+                            except (json.JSONDecodeError, Exception) as e:
+                                logger.debug(f"Non-multimedia tool result or parse error: {e}")
                             
                             if self.context_builder:
                                 messages = self.context_builder.add_tool_result(
@@ -435,6 +493,7 @@ class AgentLoop:
                                     tool_name=tool_name,
                                     arguments=tool_args,
                                     error=error_msg,
+                                    duration_ms=duration_ms,
                                 )
                             except Exception as e:
                                 logger.warning(f"Failed to send tool error notification: {e}")
@@ -506,30 +565,60 @@ class AgentLoop:
     ) -> str:
         """
         执行工具调用
-        
+
         Args:
             tool_name: 工具名称
             arguments: 工具参数
-            
+
         Returns:
             str: 工具执行结果
-            
+
         Raises:
             ValueError: 工具不存在
             Exception: 工具执行失败
         """
         if not self.tools:
             raise ValueError("ToolRegistry not initialized")
-        
+
         logger.debug(f"Executing tool: {tool_name}")
-        
+
         try:
             result = await self.tools.execute(tool_name, arguments, auto_record=False)
             return result
-            
+
         except Exception as e:
             logger.error(f"Tool execution failed: {tool_name} - {e}")
             raise
+
+    async def _persist_media(self, message_id: int) -> None:
+        """将 _pending_media 中的媒体记录持久化到数据库"""
+        if not self._pending_media:
+            return
+        try:
+            from backend.database import AsyncSessionLocal
+            from backend.models.message_media import MessageMedia
+
+            media_records = self._pending_media[:]
+            self._pending_media.clear()
+
+            if not media_records:
+                return
+
+            async with AsyncSessionLocal() as db:
+                for m in media_records:
+                    record = MessageMedia(
+                        message_id=message_id,
+                        media_type=m["media_type"],
+                        src=m["src"],
+                        name=m.get("name"),
+                        alt=m.get("alt"),
+                        tool_name=m.get("tool_name"),
+                    )
+                    db.add(record)
+                await db.commit()
+                logger.info(f"Persisted {len(media_records)} media records for message {message_id}")
+        except Exception as e:
+            logger.warning(f"Failed to persist media for message {message_id}: {e}")
 
     async def _execute_todo_tool(
         self,
@@ -547,38 +636,35 @@ class AgentLoop:
         Returns:
             str: 工具执行结果
         """
-        from backend.database import AsyncSessionLocal
-
         logger.debug(f"Executing todo tool: {tool_name}")
 
         try:
-            async with AsyncSessionLocal() as db:
-                toolkit = TodoToolkit(session_id=session_id, db=db)
+            toolkit = TodoToolkit(session_id=session_id)
 
-                if tool_name == "todo_create":
-                    tasks = arguments.get("tasks", [])
-                    result = await toolkit.todo_create(tasks)
-                elif tool_name == "todo_complete":
-                    idx = arguments.get("idx")
-                    result = await toolkit.todo_complete(idx, arguments.get("result", "done"))
-                elif tool_name == "todo_insert":
-                    idx = arguments.get("idx", 0)
-                    tasks = arguments.get("tasks", [])
-                    result = await toolkit.todo_insert(idx, tasks)
-                elif tool_name == "todo_remove":
-                    idx = arguments.get("idx")
-                    result = await toolkit.todo_remove(idx)
-                elif tool_name == "todo_clear":
-                    result = await toolkit.todo_clear()
-                elif tool_name == "todo_update":
-                    content = arguments.get("content", "")
-                    result = await toolkit.todo_update(content)
-                elif tool_name == "todo_list":
-                    result = await toolkit.todo_list()
-                else:
-                    result = f"错误：未知的 todo 工具 {tool_name}"
+            if tool_name == "todo_create":
+                tasks = arguments.get("tasks", [])
+                result = await toolkit.todo_create(tasks)
+            elif tool_name == "todo_complete":
+                idx = arguments.get("idx")
+                result = await toolkit.todo_complete(idx, arguments.get("result", "done"))
+            elif tool_name == "todo_insert":
+                idx = arguments.get("idx", 0)
+                tasks = arguments.get("tasks", [])
+                result = await toolkit.todo_insert(idx, tasks)
+            elif tool_name == "todo_remove":
+                idx = arguments.get("idx")
+                result = await toolkit.todo_remove(idx)
+            elif tool_name == "todo_clear":
+                result = await toolkit.todo_clear()
+            elif tool_name == "todo_update":
+                content = arguments.get("content", "")
+                result = await toolkit.todo_update(content)
+            elif tool_name == "todo_list":
+                result = await toolkit.todo_list()
+            else:
+                result = f"错误：未知的 todo 工具 {tool_name}"
 
-                return result
+            return result
 
         except Exception as e:
             logger.error(f"Todo tool execution failed: {tool_name} - {e}")

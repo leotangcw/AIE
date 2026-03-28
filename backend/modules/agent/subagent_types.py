@@ -13,6 +13,7 @@ class SubagentType(Enum):
     DEBUG = "debug"         # 调试任务
     REVIEW = "review"       # 代码审查
     BUILD = "build"        # 构建/测试
+    LONG_RUNNING = "long_running"  # 长时任务（无超时限制）
 
 
 class SubagentDefaults:
@@ -26,6 +27,7 @@ class SubagentDefaults:
         SubagentType.REVIEW: 120,      # 2分钟 - 代码审查相对快速
         SubagentType.BUILD: 300,       # 5分钟 - 构建测试可能需要较久
         SubagentType.GENERAL: 180,     # 3分钟 - 默认
+        SubagentType.LONG_RUNNING: 0,  # 0 = 无时间限制
     }
 
     # 每个类型的系统提示
@@ -74,6 +76,20 @@ class SubagentDefaults:
 - 采取适当的行动
 - 提供清晰准确的结果
 - 如果遇到问题，说明原因""",
+
+        SubagentType.LONG_RUNNING: """你是长时任务启动器。你的唯一职责是：分析任务 → 准备环境 → 用 start_background 启动后台命令 → 标记成功退出。
+
+## 核心规则（必须遵守）
+1. **必须用 start_background 启动耗时命令**（下载、编译、克隆等），这是你唯一的启动方式
+2. **exec 只能用于快速准备**（ls、mkdir、rm -rf 等几秒内完成的命令），绝对不能用来执行实际任务
+3. 启动成功后立即标记 [TASK_SUCCESS] 并退出
+4. 如果启动失败，标记 [TASK_FAILED: 原因]
+5. 务必指定 target_dir 参数，让心跳系统能根据目标目录变化估算进度
+
+## 你有最多5轮对话，按以下顺序执行：
+- 第1-2轮：用 exec 做准备工作（检查目录、清理旧文件等）
+- 第3-5轮：必须调用 start_background 启动任务
+- 如果你用 exec 执行了耗时命令，任务会失败并重试""",
     }
 
     @classmethod

@@ -15,12 +15,57 @@ class VectorStoreWrapper:
         """获取向量存储实例"""
         if self._store is None:
             try:
-                from backend.modules.agent.vector_store import get_vector_store
-                self._store = get_vector_store()
+                from backend.modules.agent.vector_store import VectorStore
+                import os
+                db_path = os.path.join(self.storage_dir, "vectors.db")
+                self._store = VectorStore(db_path=db_path)
             except ImportError as e:
                 logger.warning(f"Vector store not available: {e}")
                 return None
+            except Exception as e:
+                logger.warning(f"Vector store init failed: {e}")
+                return None
         return self._store
+
+    def add(
+        self,
+        content: str,
+        metadata: dict = None,
+        source_type: str = "knowledge",
+        source_id: str = None,
+    ) -> str:
+        """添加单个文档到向量库"""
+        store = self.get_store()
+        if store is None:
+            return ""
+
+        try:
+            return store.add(
+                content=content,
+                metadata=metadata or {},
+                source_type=source_type,
+                source_id=source_id,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to add to vector store: {e}")
+            return ""
+
+    def search(self, query: str, top_k: int = 5, source_type: str = None) -> list[dict]:
+        """检索"""
+        store = self.get_store()
+        if store is None:
+            return []
+
+        try:
+            results = store.search(
+                query=query,
+                top_k=top_k,
+                source_type=source_type,
+            )
+            return results
+        except Exception as e:
+            logger.warning(f"Vector search failed: {e}")
+            return []
 
     async def add_documents(self, documents: list[dict], source_type: str = "knowledge"):
         """添加文档到向量库"""
@@ -36,28 +81,21 @@ class VectorStoreWrapper:
                 entries = [{"content": chunks, "metadata": doc}]
 
             try:
-                store.add_batch(entries=entries, source_type=source_type, source_id=doc.get("id"))
+                for entry in entries:
+                    store.add(
+                        content=entry["content"],
+                        metadata=entry.get("metadata", {}),
+                        source_type=source_type,
+                        source_id=doc.get("id"),
+                    )
             except Exception as e:
                 logger.warning(f"Failed to add to vector store: {e}")
 
-    async def search(self, query: str, top_k: int = 5, source_type: str = "knowledge") -> list[dict]:
-        """检索"""
-        store = self.get_store()
-        if store is None:
-            return []
+    async def search_async(self, query: str, top_k: int = 5, source_type: str = "knowledge") -> list[dict]:
+        """异步检索"""
+        return self.search(query, top_k, source_type)
 
-        try:
-            results = store.search_hybrid(
-                query=query,
-                top_k=top_k,
-                source_type=source_type
-            )
-            return results
-        except Exception as e:
-            logger.warning(f"Vector search failed: {e}")
-            return []
-
-    async def count(self, source_type: str = "knowledge") -> int:
+    def count(self, source_type: str = "knowledge") -> int:
         """统计数量"""
         store = self.get_store()
         if store is None:
@@ -66,3 +104,17 @@ class VectorStoreWrapper:
             return store.count(source_type=source_type)
         except Exception:
             return 0
+
+    def get_stats(self) -> dict:
+        """获取统计信息"""
+        store = self.get_store()
+        if store is None:
+            return {"available": False}
+
+        try:
+            return {
+                "available": True,
+                "count": self.count(),
+            }
+        except Exception as e:
+            return {"available": False, "error": str(e)}

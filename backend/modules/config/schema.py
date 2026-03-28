@@ -2,8 +2,40 @@
 from __future__ import annotations
 
 from typing import Optional, Literal
+from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+
+
+# ============================================================================
+# 高级模型参数 - 灵活扩展
+# ============================================================================
+
+class AdvancedModelParams(BaseModel):
+    """高级模型参数 - 允许任意额外字段"""
+    model_config = ConfigDict(extra='allow')
+
+    top_p: Optional[float] = Field(None, ge=0, le=1)
+    frequency_penalty: Optional[float] = Field(None, ge=-2, le=2)
+    presence_penalty: Optional[float] = Field(None, ge=-2, le=2)
+    stop: Optional[list[str]] = None
+    response_format: Optional[dict] = None
+
+
+# ============================================================================
+# 基础模型配置
+# ============================================================================
+
+class BaseModelConfig(BaseModel):
+    """基础模型配置 - 所有模型配置的父类"""
+    provider: str = ""
+    model: str = ""
+    api_key: Optional[str] = None
+    api_base: Optional[str] = None
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    max_tokens: int = Field(default=4096, ge=0, le=1000000)
+    enabled: bool = True
+    advanced_params: dict = Field(default_factory=dict)
 
 
 class ProviderConfig(BaseModel):
@@ -11,6 +43,11 @@ class ProviderConfig(BaseModel):
     api_key: str = ""
     api_base: Optional[str] = None
     enabled: bool = False
+
+
+class MainAgentConfig(BaseModelConfig):
+    """主 Agent 模型配置"""
+    max_iterations: int = Field(default=9999, ge=1, le=99999, description="最大工具调用次数")
 
 
 class SubAgentConfig(BaseModel):
@@ -21,6 +58,35 @@ class SubAgentConfig(BaseModel):
     max_concurrent: int = 3
     temperature: float = Field(default=0.5, ge=0.0, le=2.0)
     max_tokens: int = Field(default=2048, ge=0)
+    api_key: Optional[str] = None
+    api_base: Optional[str] = None
+    advanced_params: dict = Field(default_factory=dict)
+
+
+# ============================================================================
+# 增强模型配置
+# ============================================================================
+
+class EnhancedModelType(str, Enum):
+    """增强模型类型"""
+    MULTIMODAL = "multimodal"      # 多模态理解（图像、音频）
+    IMAGE_GEN = "image_gen"        # 图像生成
+    VIDEO_GEN = "video_gen"        # 视频生成
+    AUDIO_GEN = "audio_gen"        # 语音合成（TTS）
+    MUSIC_GEN = "music_gen"        # 音乐生成
+    THREE_D = "3d_gen"             # 3D 生成
+    CODE_GEN = "code_gen"          # 代码生成专用
+    TRANSLATION = "translation"    # 翻译专用
+    CUSTOM = "custom"              # 自定义
+
+
+class EnhancedModelConfig(BaseModelConfig):
+    """增强模型配置"""
+    id: str = Field(default_factory=lambda: f"enhanced_{id(object())}")
+    model_type: str = Field(default="custom", description="模型类型")
+    description: str = Field(default="", description="模型描述")
+    capabilities: list[str] = Field(default_factory=list, description="模型能力标签")
+    priority: int = Field(default=0, ge=0, le=100, description="调用优先级")
 
 
 class DatabaseConfig(BaseModel):
@@ -258,7 +324,9 @@ class AppConfig(BaseModel):
     """应用配置"""
     providers: dict[str, ProviderConfig] = Field(default_factory=dict)
     model: ModelConfig = Field(default_factory=ModelConfig)
+    main_agent: MainAgentConfig = Field(default_factory=MainAgentConfig)
     sub_agent: SubAgentConfig = Field(default_factory=SubAgentConfig)
+    enhanced_models: list[EnhancedModelConfig] = Field(default_factory=list)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     built_in: BuiltInModelConfig = Field(default_factory=BuiltInModelConfig)
     workspace: WorkspaceConfig = Field(default_factory=WorkspaceConfig)

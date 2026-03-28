@@ -17,9 +17,13 @@
       />
     </div>
 
+    <button class="download-btn" title="下载音频" @click="downloadAudio">
+      <DownloadIcon :size="16" />
+    </button>
+
     <audio
       ref="audioRef"
-      :src="src"
+      :src="resolvedSrc"
       @timeupdate="onTimeUpdate"
       @loadedmetadata="onLoaded"
       @ended="onEnded"
@@ -30,7 +34,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Play as PlayIcon, Pause as PauseIcon } from 'lucide-vue-next'
+import { Play as PlayIcon, Pause as PauseIcon, Download as DownloadIcon } from 'lucide-vue-next'
 
 const props = defineProps<{
   src: string
@@ -45,6 +49,13 @@ const duration = ref(0)
 const progress = computed(() => {
   if (duration.value === 0) return 0
   return (currentTime.value / duration.value) * 100
+})
+
+const resolvedSrc = computed(() => {
+  if (!props.src) return ''
+  if (props.src.startsWith('/api/files/')) return props.src
+  if (props.src.startsWith('http://') || props.src.startsWith('https://')) return props.src
+  return `/api/files/${props.src}`
 })
 
 function togglePlay() {
@@ -86,6 +97,15 @@ function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60)
   const secs = Math.floor(seconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+function downloadAudio() {
+  const src = resolvedSrc.value
+  if (!src) return
+  const a = document.createElement('a')
+  a.href = src
+  a.download = props.name || 'audio'
+  a.click()
 }
 </script>
 
@@ -151,5 +171,20 @@ function formatDuration(seconds: number): string {
   height: 100%;
   background: var(--color-primary, #3b82f6);
   transition: width 0.1s;
+}
+
+.download-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary, #666);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+
+.download-btn:hover {
+  color: var(--color-text, #333);
 }
 </style>

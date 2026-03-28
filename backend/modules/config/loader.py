@@ -33,8 +33,19 @@ class ConfigLoader:
             config_dict: dict[str, Any] = {}
             for setting in settings:
                 key_path = setting.key.replace("config.", "")
-                value = json.loads(setting.value)
-                
+
+                # Handle empty or invalid JSON values
+                try:
+                    if setting.value is None or (isinstance(setting.value, str) and setting.value.strip() == ""):
+                        logger.warning(f"Empty value for {setting.key}, skipping")
+                        continue
+                    value = json.loads(setting.value)
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, treat the raw string as the value
+                    # This handles cases where values are stored without JSON encoding
+                    value = setting.value
+                    logger.debug(f"Using raw string value for {setting.key}")
+
                 if value is None and "api_key" in key_path:
                     value = ""
                 

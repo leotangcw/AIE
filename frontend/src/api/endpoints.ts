@@ -117,20 +117,89 @@ export interface WorkspaceConfig {
     path: string
 }
 
+export interface SubAgentConfig {
+    enabled: boolean
+    provider: string
+    model: string
+    max_concurrent: number
+    temperature: number
+    max_tokens: number
+    api_key?: string
+    api_base?: string
+    advanced_params?: Record<string, any>
+}
+
+export interface MainAgentConfig {
+    provider: string
+    model: string
+    temperature: number
+    max_tokens: number
+    max_iterations: number
+    enabled: boolean
+    advanced_params: Record<string, any>
+    api_key?: string
+    api_base?: string
+}
+
+export interface EnhancedModelConfig {
+    id: string
+    model_type: string
+    provider: string
+    model: string
+    enabled: boolean
+    description: string
+    capabilities: string[]
+    priority: number
+    temperature?: number
+    max_tokens?: number
+    api_key?: string
+    api_base?: string
+    advanced_params?: Record<string, any>
+}
+
+export interface EmbeddingApiFallback {
+    provider: string
+    model: string
+    api_key?: string | null
+    api_base?: string | null
+}
+
+export interface EmbeddingConfig {
+    model: string
+    dimension: number
+    max_length: number
+    device: string
+    use_fp16: boolean
+    cache_dir?: string | null
+    use_modelscope: boolean
+    modelscope_endpoint?: string | null
+    api_fallback?: EmbeddingApiFallback | null
+}
+
+export interface BuiltInConfig {
+    embedding: EmbeddingConfig
+}
+
 export interface UpdateSettingsRequest {
     providers?: Record<string, Partial<ProviderConfig>>
     model?: Partial<ModelConfig>
     workspace?: Partial<WorkspaceConfig>
     security?: Partial<SecurityConfig>
     persona?: Partial<PersonaConfig>
+    sub_agent?: Partial<SubAgentConfig>
+    built_in?: { embedding?: Partial<EmbeddingConfig> }
 }
 
 export interface Settings {
     providers: Record<string, ProviderConfig>
     model: ModelConfig
+    main_agent?: MainAgentConfig
+    sub_agent?: SubAgentConfig
+    enhanced_models?: EnhancedModelConfig[]
     workspace: WorkspaceConfig
     security: SecurityConfig
     persona: PersonaConfig
+    built_in?: BuiltInConfig
 }
 
 export interface TestConnectionRequest {
@@ -445,6 +514,29 @@ export const settingsAPI = {
 
     getProviders: (): Promise<ProviderMetadata[]> =>
         apiClient.get('/settings/providers'),
+
+    // Embedder API
+    getEmbedderStatus: (): Promise<{
+        loaded: boolean
+        cache_path: string | null
+        model: string | null
+        dimension: number | null
+        device: string | null
+        error: string | null
+    }> =>
+        apiClient.get('/settings/embedder/status'),
+
+    testEmbedder: (data: {
+        provider: string
+        model: string
+        api_base?: string
+    }): Promise<{
+        success: boolean
+        message?: string
+        error?: string
+        dimension?: number
+    }> =>
+        apiClient.post('/settings/embedder/test', data),
 }
 
 /**
