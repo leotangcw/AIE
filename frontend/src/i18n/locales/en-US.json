@@ -136,6 +136,8 @@
         "typeDatabase": "Database",
         "typeApi": "API",
         "typeWeb": "Web",
+        "typeWebSearch": "Web Search",
+        "toggleError": "Failed to toggle source status",
         "localPath": "Local Directory",
         "localPathPlaceholder": "Enter local directory path, e.g., /home/user/docs",
         "lastSync": "Last sync",
@@ -160,7 +162,14 @@
         "syncSuccess": "Sync success",
         "syncError": "Sync failed",
         "browse": "Browse",
-        "pathHint": "Click Browse to select a folder"
+        "pathHint": "Enter an absolute path on the server, e.g., /home/user/docs",
+        "regulations": {
+            "title": "Enterprise Regulations",
+            "description": "Manage internal regulations as reference constraints for the Agent",
+            "ready": "Ready",
+            "notCreated": "Not Created",
+            "created": "Regulations knowledge base created. Configure the directory path and sync."
+        }
     },
     "knowledgeHub": {
         "title": "Knowledge Hub",
@@ -582,7 +591,7 @@
         "syncSuccess": "Sync success",
         "syncError": "Sync failed",
             "browse": "Browse",
-            "pathHint": "Click Browse to select a folder"
+            "pathHint": "Enter an absolute path on the server, e.g., /home/user/docs"
         },
         "saveSuccess": "Settings saved successfully",
         "saveError": "Failed to save settings",
@@ -1489,5 +1498,53 @@
         "perspective": "Perspective",
         "dependsOn": "Depends on",
         "condition": "Condition"
+    },
+    "experience": {
+        "title": "SuperWorkers Workbench",
+        "description": "Trace recording, skill distillation and experience evolution",
+        "tabs": {
+            "overview": "Overview",
+            "traces": "Activity Traces",
+            "skills": "Skill Evolution"
+        },
+        "stats": {
+            "totalTraces": "Total Traces",
+            "successRate": "Success Rate",
+            "knowledgeRate": "Knowledge Usage",
+            "avgDuration": "Avg Duration"
+        },
+        "taskDistribution": "Task Type Distribution",
+        "taskTypes": {
+            "knowledge_query": "Knowledge Query",
+            "content_creation": "Content Creation",
+            "web_search": "Web Search",
+            "coding": "Coding",
+            "general": "General"
+        },
+        "recentTraces": "Recent Traces",
+        "noTraces": "No traces yet",
+        "noTracesHint": "Enable the SuperWorkers plugin to automatically record Agent operations",
+        "filters": {
+            "allTypes": "All Types",
+            "allOutcomes": "All Outcomes",
+            "success": "Success",
+            "failure": "Failure"
+        },
+        "toolCalls": "tool calls",
+        "userMessage": "User Message",
+        "toolCallSequence": "Tool Call Sequence",
+        "knowledgeUsage": "Knowledge Usage",
+        "noDetail": "No detail data available",
+        "distillNew": "Distill New Skills",
+        "distilling": "Distilling...",
+        "candidates": "Candidate Skills",
+        "noCandidates": "No candidate skills",
+        "noCandidatesHint": "Click 'Distill New Skills' to extract reusable patterns from recent traces",
+        "promote": "Publish",
+        "reject": "Reject",
+        "publishedSkills": "Published Skills",
+        "noPublishedSkills": "No published skills",
+        "published": "Published",
+        "confidence": "Confidence"
     }
 }

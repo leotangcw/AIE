@@ -1,59 +1,124 @@
-// 经验学习 API 客户端
+// SuperWorkers 轨迹与技能进化 API 客户端
 import apiClient from './client'
 
-export interface LearnedSkill {
-  id: string
-  name: string
-  description: string
-  trigger_conditions: string[]
-  action_steps: string[]
-  confidence: number
-  source: string
-  usage_count: number
+// ── 类型定义 ──
+
+export interface TraceStats {
+  total: number
+  success_count: number
+  success_rate: number
+  with_knowledge: number
+  knowledge_rate: number
+  avg_duration: number
+  avg_tool_calls: number
 }
 
-export interface LearnRequest {
-  task_description: string
-  user_feedback: string
-  original_output: string
-  final_output: string
-  context?: Record<string, any>
+export interface TraceSummary {
+  trace_id: string
+  session_id: string
+  started_at: string
+  ended_at: string
+  task_type: string
+  outcome: string
+  has_knowledge: number
+  tool_calls_count: number
+  total_duration_ms: number
 }
+
+export interface TraceDetail extends TraceSummary {
+  input: { user_message: string; channel: string }
+  execution: { iterations: any[]; tool_calls: TraceToolCall[] }
+  knowledge_stage: {
+    local_skills_checked: any[]
+    local_skills_used: string[]
+    enterprise_knowledge_queried: boolean
+    knowledge_results: { query: string; result_preview: string; mode: string }[]
+  }
+  output: { outcome: string; tool_calls_count: number }
+  metadata: { model: string; task_type: string; total_duration_ms: number; plugin_active: string }
+}
+
+export interface TraceToolCall {
+  tool: string
+  arguments: Record<string, any>
+  called_at: string
+  duration_ms: number | null
+  success: boolean | null
+  result_summary: string | null
+}
+
+export interface SkillMeta {
+  name: string
+  title: string
+  description: string
+  confidence: number
+  created: string
+  status: string
+}
+
+export interface CandidateSkillDetail {
+  name: string
+  content: string
+}
+
+// ── API 方法 ──
 
 export const experienceAPI = {
-  // 获取所有技能
-  async getSkills(minConfidence: number = 0): Promise<LearnedSkill[]> {
-    const response = await apiClient.get(`/api/experience/skills?min_confidence=${minConfidence}`)
+  // 获取轨迹统计
+  async getTraceStats(days: number = 30): Promise<TraceStats> {
+    const response = await apiClient.get('/api/traces/stats', { params: { days } })
     return response.data
   },
 
-  // 获取单个技能
-  async getSkill(skillId: string): Promise<LearnedSkill> {
-    const response = await apiClient.get(`/api/experience/skills/${skillId}`)
+  // 获取最近轨迹列表
+  async getTraces(params: {
+    limit?: number
+    task_type?: string
+    outcome?: string
+  } = {}): Promise<TraceSummary[]> {
+    const response = await apiClient.get('/api/traces', { params })
     return response.data
   },
 
-  // 从反馈学习
-  async learn(request: LearnRequest): Promise<LearnedSkill> {
-    const response = await apiClient.post('/api/experience/learn', request)
+  // 获取轨迹详情
+  async getTraceDetail(traceId: string): Promise<TraceDetail> {
+    const response = await apiClient.get(`/api/traces/${traceId}`)
     return response.data
   },
 
-  // 应用技能
-  async applySkill(skillId: string): Promise<void> {
-    await apiClient.post(`/api/experience/skills/${skillId}/apply`)
+  // 从轨迹提炼候选技能
+  async distillSkills(): Promise<{ message: string }> {
+    const response = await apiClient.post('/api/traces/distill')
+    return response.data
   },
 
-  // 更新置信度
-  async updateConfidence(skillId: string, delta: number): Promise<void> {
-    await apiClient.post(`/api/experience/skills/${skillId}/confidence`, null, {
-      params: { delta }
-    })
+  // 获取候选技能列表
+  async getCandidateSkills(): Promise<SkillMeta[]> {
+    const response = await apiClient.get('/api/traces/skills/candidates')
+    return response.data
   },
 
-  // 导出技能
-  async exportSkills(): Promise<{ skills: any[] }> {
-    const response = await apiClient.get('/api/experience/export')
+  // 获取候选技能详情
+  async getCandidateSkillDetail(name: string): Promise<CandidateSkillDetail> {
+    const response = await apiClient.get(`/api/traces/skills/candidates/${name}`)
+    return response.data
+  },
+
+  // 发布候选技能
+  async promoteCandidateSkill(name: string): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post(`/api/traces/skills/candidates/${name}/promote`)
+    return response.data
+  },
+
+  // 拒绝候选技能
+  async rejectCandidateSkill(name: string): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post(`/api/traces/skills/candidates/${name}/reject`)
+    return response.data
+  },
+
+  // 获取正式技能列表
+  async getSkills(): Promise<SkillMeta[]> {
+    const response = await apiClient.get('/api/traces/skills')
     return response.data
   },
 }

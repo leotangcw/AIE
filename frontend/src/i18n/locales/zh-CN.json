@@ -140,6 +140,8 @@
         "typeDatabase": "数据库",
         "typeApi": "API",
         "typeWeb": "网页",
+        "typeWebSearch": "网络搜索",
+        "toggleError": "切换知识源状态失败",
         "localPath": "本地目录",
         "localPathPlaceholder": "输入本地目录路径，如：/home/user/docs",
         "lastSync": "上次同步",
@@ -164,7 +166,14 @@
         "syncSuccess": "同步成功",
         "syncError": "同步失败",
         "browse": "浏览",
-        "pathHint": "点击浏览按钮选择文件夹"
+        "pathHint": "输入服务器上的绝对路径，如：/home/user/docs",
+        "regulations": {
+            "title": "企业规章制度",
+            "description": "管理企业内部规章制度，作为 Agent 执行任务时的约束参考",
+            "ready": "已就绪",
+            "notCreated": "未创建",
+            "created": "规章制度知识库已创建，请配置目录路径后同步"
+        }
     },
     "knowledgeHub": {
         "title": "知识中枢",
@@ -610,7 +619,7 @@
         "syncSuccess": "同步成功",
         "syncError": "同步失败",
             "browse": "浏览",
-            "pathHint": "点击浏览按钮选择文件夹"
+            "pathHint": "输入服务器上的绝对路径，如：/home/user/docs"
         },
         "saveSuccess": "设置保存成功",
         "saveError": "保存设置失败",
@@ -961,7 +970,7 @@
         "syncSuccess": "同步成功",
         "syncError": "同步失败",
             "browse": "浏览",
-            "pathHint": "点击浏览按钮选择文件夹"
+            "pathHint": "输入服务器上的绝对路径，如：/home/user/docs"
         },
         "channels": {
             "title": "渠道配置",
@@ -1529,5 +1538,53 @@
         "perspective": "视角",
         "dependsOn": "依赖 Agent",
         "condition": "条件"
+    },
+    "experience": {
+        "title": "SuperWorkers 工作台",
+        "description": "轨迹记录、技能提炼与经验进化管理",
+        "tabs": {
+            "overview": "概览",
+            "traces": "操作轨迹",
+            "skills": "技能进化"
+        },
+        "stats": {
+            "totalTraces": "总轨迹数",
+            "successRate": "成功率",
+            "knowledgeRate": "知识使用率",
+            "avgDuration": "平均耗时"
+        },
+        "taskDistribution": "任务类型分布",
+        "taskTypes": {
+            "knowledge_query": "知识检索",
+            "content_creation": "内容创作",
+            "web_search": "网络搜索",
+            "coding": "编程开发",
+            "general": "通用任务"
+        },
+        "recentTraces": "最近轨迹",
+        "noTraces": "暂无轨迹数据",
+        "noTracesHint": "启用 SuperWorkers 插件后，Agent 操作将被自动记录",
+        "filters": {
+            "allTypes": "全部类型",
+            "allOutcomes": "全部结果",
+            "success": "成功",
+            "failure": "失败"
+        },
+        "toolCalls": "次工具调用",
+        "userMessage": "用户消息",
+        "toolCallSequence": "工具调用序列",
+        "knowledgeUsage": "知识使用情况",
+        "noDetail": "暂无详情数据",
+        "distillNew": "提炼新技能",
+        "distilling": "正在提炼...",
+        "candidates": "候选技能",
+        "noCandidates": "暂无候选技能",
+        "noCandidatesHint": "点击「提炼新技能」从近期轨迹中自动提取可复用模式",
+        "promote": "发布",
+        "reject": "拒绝",
+        "publishedSkills": "正式技能",
+        "noPublishedSkills": "暂无正式技能",
+        "published": "已发布",
+        "confidence": "置信度"
     }
 }

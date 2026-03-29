@@ -438,8 +438,6 @@ import {
   Trash2 as TrashIcon,
   List as ListIcon,
   ListTodo as ListTodoIcon,
-  BookOpen as BookOpenIcon,
-  Search as SearchIcon,
   Image as ImageIcon,
   CheckCircle as CheckCircleIcon,
   Paperclip as PaperclipIcon,
@@ -482,12 +480,26 @@ import { toolsAPI, authAPI, todoAPI, settingsAPI } from '@/api/endpoints'
 // 导入停止 API
 import { stopAPI } from '@/api/endpoints'
 
-// 知识检索组合图标组件
+// 知识检索组合图标（书 + 放大镜 SVG）
 const KnowledgeSearchIcon = {
   render() {
-    return h('div', { class: 'knowledge-icon' }, [
-      h(BookOpenIcon, { size: 20 }),
-      h(SearchIcon, { size: 12, class: 'search-badge' })
+    return h('svg', {
+      width: 20,
+      height: 20,
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': 2,
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round'
+    }, [
+      // 书本主体
+      h('path', { d: 'M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z' }),
+      h('path', { d: 'M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z' }),
+      // 放大镜（右下角叠加在书上）
+      h('circle', { cx: '18', cy: '18', r: '3.5', fill: 'currentColor', stroke: 'none', opacity: '0.15' }),
+      h('circle', { cx: '18', cy: '18', r: '3.5' }),
+      h('line', { x1: '20.5', y1: '20.5', x2: '23', y2: '23' })
     ])
   }
 }
@@ -560,7 +572,7 @@ const handleSetupPassword = async () => {
   }
 }
 
-type PanelType = 'sessions' | 'tools' | 'memory' | 'skills' | 'cron' | 'tasks' | 'settings' | 'heartbeat' | null
+type PanelType = 'sessions' | 'tools' | 'memory' | 'skills' | 'cron' | 'tasks' | 'settings' | 'heartbeat' | 'experience' | 'knowledge_search' | null
 
 // Initialize chat composable with reactive session ID
 const messages = ref<any[]>([])
@@ -1301,15 +1313,15 @@ const fileAcceptTypes = 'image/*,audio/*,video/*,.pdf,.doc,.docx,.txt'
 const headerActions = computed(() => [
   { id: 'sessions', icon: HistoryIcon, label: 'nav.sessions', tooltip: 'nav.sessionsTooltip', onClick: () => showPanel('sessions') },
   // { id: 'tools', icon: ToolsIcon, label: 'nav.tools', onClick: () => showPanel('tools') }, // 隐藏工具面板
+  { id: 'timeline', icon: ListIcon, label: 'nav.timeline', tooltip: 'nav.timelineTooltip', onClick: () => toggleTimeline() },
   { id: 'memory', icon: BrainIcon, label: 'nav.memory', tooltip: 'nav.memoryTooltip', onClick: () => showPanel('memory') },
-  { id: 'skills', icon: ZapIcon, label: 'nav.skills', tooltip: 'nav.skillsTooltip', onClick: () => showPanel('skills') },
   { id: 'teams', icon: UsersIcon, label: 'nav.teams', tooltip: 'nav.teamsTooltip', onClick: () => teamsStore.toggleTeamsPanel() },
+  { id: 'skills', icon: ZapIcon, label: 'nav.skills', tooltip: 'nav.skillsTooltip', onClick: () => showPanel('skills') },
   { id: 'experience', icon: GraduationIcon, label: 'nav.experience', tooltip: 'nav.experienceTooltip', onClick: () => showPanel('experience') },
+  { id: 'knowledge_search', icon: KnowledgeSearchIcon, label: 'nav.knowledgeSearch', tooltip: 'nav.knowledgeSearchTooltip', onClick: () => showPanel('knowledge_search') },
   // tasks 已移至左侧常驻显示
   { id: 'cron', icon: ClockIcon, label: 'nav.cron', tooltip: 'nav.cronTooltip', onClick: () => showPanel('cron') },
   // heartbeat 已移至左侧常驻显示
-  { id: 'timeline', icon: ListIcon, label: 'nav.timeline', tooltip: 'nav.timelineTooltip', onClick: () => toggleTimeline() },
-  { id: 'knowledge_search', icon: KnowledgeSearchIcon, label: 'nav.knowledgeSearch', tooltip: 'nav.knowledgeSearchTooltip', onClick: () => showPanel('knowledge_search') },
   { id: 'settings', icon: SettingsIcon, label: 'settings.title', tooltip: 'nav.settingsTooltip', onClick: () => showPanel('settings') }
 ])
 
@@ -1928,7 +1940,9 @@ const getPanelTitle = () => {
     memory: t('nav.memory'),
     skills: t('nav.skills'),
     cron: t('nav.cron'),
-    settings: t('settings.title')
+    settings: t('settings.title'),
+    experience: t('nav.experience'),
+    knowledge_search: t('nav.knowledgeSearch'),
   }
   return activePanel.value ? titles[activePanel.value] : ''
 }
@@ -3079,22 +3093,6 @@ onBeforeUnmount(() => {
   .timeline-sidebar {
     width: 100%;
   }
-}
-
-/* 知识检索组合图标 */
-.knowledge-icon {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-}
-
-.knowledge-icon .search-badge {
-  position: absolute;
-  bottom: -2px;
-  right: -4px;
 }
 
 .chat-pane {

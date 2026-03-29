@@ -106,6 +106,16 @@ def _create_shared_components(config):
         skills_loader=skills,
     )
 
+    # 初始化 KnowledgeHub（知识库工具 + API 共享）
+    knowledge_hub = None
+    try:
+        from backend.modules.knowledge_hub import KnowledgeHub
+        knowledge_hub = KnowledgeHub()
+        tool_params["knowledge_hub"] = knowledge_hub
+        logger.info("KnowledgeHub initialized for tools and API")
+    except Exception as e:
+        logger.warning(f"KnowledgeHub not available for tools: {e}")
+
     logger.info("Registering all tools...")
     tool_registry = register_all_tools(**tool_params, memory_store=memory)
     logger.info(f"Registered {len(tool_registry)} tools")
@@ -119,6 +129,7 @@ def _create_shared_components(config):
         tool_params=tool_params,
         memory=memory,
         skills=skills,
+        knowledge_hub=knowledge_hub,
     )
 
 
@@ -575,6 +586,7 @@ from backend.api.queue import router as queue_router
 from backend.api.auth import router as auth_router
 from backend.api.personalities import router as personalities_router
 from backend.api.experience import router as experience_router
+from backend.api.traces import router as traces_router
 from backend.api.rules import router as rules_router
 from backend.api.security import router as security_router
 from backend.api.knowledge import router as knowledge_router
@@ -607,6 +619,7 @@ app.include_router(channels_router)
 app.include_router(queue_router)
 app.include_router(personalities_router)
 app.include_router(experience_router)
+app.include_router(traces_router)
 app.include_router(rules_router)
 app.include_router(security_router)
 app.include_router(knowledge_router)
@@ -738,6 +751,7 @@ async def init_plugins():
     """应用启动时初始化插件系统"""
     from backend.modules.plugins import get_plugin_manager
     from backend.modules.plugins.superpowers import Plugin as SuperpowersPlugin
+    from backend.modules.plugins.superworkers import SuperWorkersPlugin
     from pathlib import Path
 
     # 初始化插件管理器
@@ -745,6 +759,7 @@ async def init_plugins():
 
     # 注册内置插件
     plugin_manager.register(SuperpowersPlugin(plugin_manager))
+    plugin_manager.register(SuperWorkersPlugin(plugin_manager))
 
     logger.info("Plugin system initialized")
 
