@@ -96,7 +96,7 @@ cd frontend && npm run dev
 python start_desktop.py
 ```
 
-打开浏览器访问 `http://localhost:5173` 即可使用。
+打开浏览器访问 `http://localhost:21000` 即可使用。
 
 ## 团队协作
 
