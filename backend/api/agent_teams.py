@@ -47,6 +47,14 @@ class AgentDefinition(BaseModel):
     task: str = Field(default="", description="What this agent should do (pipeline/graph only)")
     perspective: Optional[str] = Field(None, description="Viewpoint label (council mode only)")
     depends_on: List[str] = Field(default_factory=list, description="IDs this agent waits for (graph mode)")
+    condition: Optional[dict] = Field(
+        None,
+        description=(
+            "Conditional expression for execution (graph mode). "
+            "Expected format: {\"type\": \"output_contains\", \"text\": \"expected content\"}. "
+            "Supported types: output_contains, output_not_contains."
+        ),
+    )
 
 
 class AgentTeamCreate(BaseModel):
@@ -64,6 +72,7 @@ class AgentTeamUpdate(BaseModel):
     description: Optional[str] = None
     mode: Optional[str] = Field(None, pattern="^(pipeline|graph|council)$")
     agents: Optional[List[AgentDefinition]] = None
+    condition: Optional[dict] = Field(None, description="Conditional expression for execution (graph mode)")
     is_active: Optional[bool] = None
     cross_review: Optional[bool] = Field(None, description="Council mode only: enable cross-review between members")
     enable_skills: Optional[bool] = Field(None, description="Enable skills system for sub-agents")
@@ -298,6 +307,7 @@ async def execute_workflow(payload: ExecuteWorkflowRequest) -> dict:
         cancel_token=cancel_token,
         skills=skills,
         task_board_id=task_board_id,
+        team_name=team.name,
     )
 
     # 根据模式执行工作流

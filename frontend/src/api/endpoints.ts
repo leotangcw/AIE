@@ -512,6 +512,9 @@ export const settingsAPI = {
     testConnection: (data: TestConnectionRequest): Promise<TestConnectionResponse> =>
         apiClient.post('/settings/test-connection', data),
 
+    getModelStatus: (): Promise<Record<string, any>> =>
+        apiClient.get('/model-status'),
+
     getProviders: (): Promise<ProviderMetadata[]> =>
         apiClient.get('/settings/providers'),
 

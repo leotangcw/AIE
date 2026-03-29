@@ -34,6 +34,7 @@ const props = withDefaults(defineProps<{
 const roleLabels: Record<string, string> = {
   main: '主模型',
   sub: '子模型',
+  embedder: '嵌入模型',
 }
 
 function statusClass(info: ModelInfo): string {

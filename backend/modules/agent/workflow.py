@@ -56,6 +56,7 @@ class WorkflowEngine:
         task_board_id: str | None = None,
         team_model_config: dict | None = None,
         event_callback=None,
+        team_name: str | None = None,
     ) -> None:
         self._mgr = subagent_manager
         self._session_id = session_id
@@ -64,6 +65,7 @@ class WorkflowEngine:
         self._task_board_id = task_board_id  # 任务看板ID
         self._team_model_config = team_model_config  # 团队模型配置
         self._event_callback = event_callback
+        self._team_name = team_name or "untitled"
         # 每个 agent 的执行数据（工具调用 + 结论），最终序列化到结果中用于持久化
         self._execution_data: dict[str, dict] = {}
 
@@ -275,6 +277,14 @@ class WorkflowEngine:
         if not stages:
             return "No pipeline stages defined."
 
+        await self._emit_ws(
+            "workflow_start",
+            mode="pipeline",
+            team_name=self._team_name,
+            goal=goal,
+            agents=[{"id": s.get("id", ""), "role": s.get("role", ""), "task": s.get("task", "")} for s in stages],
+        )
+
         accumulated: str = ""
         stage_outputs: list[dict] = []
 
@@ -318,6 +328,8 @@ class WorkflowEngine:
         lines = [f"# Pipeline Workflow Results\n\n**Goal:** {goal}\n"]
         for entry in stage_outputs:
             lines.append(f"## {entry['role']}\n\n{entry['output']}")
+
+        await self._emit_ws("workflow_complete", mode="pipeline", team_name=self._team_name, goal=goal)
         return "\n\n---\n\n".join(lines) + self._build_exec_metadata()
 
     # ------------------------------------------------------------------
@@ -328,6 +340,14 @@ class WorkflowEngine:
         """依赖 DAG — 自动并行调度无依赖的节点。"""
         if not slots:
             return "No graph slots defined."
+
+        await self._emit_ws(
+            "workflow_start",
+            mode="graph",
+            team_name=self._team_name,
+            goal=goal,
+            agents=[{"id": s.get("id", ""), "role": s.get("role", ""), "task": s.get("task", "")} for s in slots],
+        )
 
         # 按 slot ID 索引系统提示词
         slot_system_prompts: dict[str, str | None] = {}
@@ -457,6 +477,8 @@ class WorkflowEngine:
                 lines.append(slot.output)
             elif slot.error:
                 lines.append(f"*Error: {slot.error}*")
+
+        await self._emit_ws("workflow_complete", mode="graph", team_name=self._team_name, goal=goal)
         return "\n\n---\n\n".join(lines) + self._build_exec_metadata()
 
     # ------------------------------------------------------------------
@@ -474,6 +496,14 @@ class WorkflowEngine:
         """
         if not members:
             return "No council members defined."
+
+        await self._emit_ws(
+            "workflow_start",
+            mode="council",
+            team_name=self._team_name,
+            question=question,
+            agents=[{"id": m.get("id", ""), "role": m.get("role", ""), "task": m.get("task", "")} for m in members],
+        )
 
         member_map: dict[str, str] = {
             m["id"]: m.get("perspective", "neutral analyst") for m in members
@@ -505,7 +535,7 @@ class WorkflowEngine:
                 prompt,
                 label=f"{perspective} — 第1轮",
                 system_prompt=member_system_prompts[mid],
-                agent_id=f"{mid}:R1",
+                agent_id=mid,
                 enable_skills=enable_skills,  # 传递技能开关
             )
             return mid, result
@@ -529,6 +559,7 @@ class WorkflowEngine:
                 blocks.append(f"### {persp}\n\n{round1.get(mid, '')}")
 
             body = "\n\n---\n\n".join(blocks)
+            await self._emit_ws("workflow_complete", mode="council", team_name=self._team_name, question=question)
             return (
                 f"# 多视角分析结果（独立模式）\n\n"
                 f"**议题：** {question}\n\n"
@@ -562,7 +593,7 @@ class WorkflowEngine:
                 prompt,
                 label=f"{perspective} — 交叉评审",
                 system_prompt=member_system_prompts[mid],
-                agent_id=f"{mid}:R2",
+                agent_id=mid,
                 enable_skills=enable_skills,  # 传递技能开关
             )
             return mid, result
@@ -583,6 +614,7 @@ class WorkflowEngine:
             )
 
         body = "\n\n---\n\n".join(blocks)
+        await self._emit_ws("workflow_complete", mode="council", team_name=self._team_name, question=question)
         return (
             f"# 多视角评审结果（交叉模式）\n\n"
             f"**议题：** {question}\n\n"

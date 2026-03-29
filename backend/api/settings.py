@@ -875,13 +875,27 @@ async def get_embedder_status() -> EmbedderStatusResponse:
             if cache_path.exists():
                 model_path = str(cache_path)
 
+        # Check actual embedder loading state from ModelRegistry
+        loaded = False
+        error = None
+        try:
+            from backend.core.model_registry import get_model_registry
+            registry = get_model_registry()
+            # If _embedder has been initialized (not None), it loaded successfully
+            if registry._embedder is not None:
+                loaded = True
+        except RuntimeError:
+            pass  # ModelRegistry not initialized yet
+        except Exception as e:
+            error = str(e)
+
         return EmbedderStatusResponse(
-            loaded=False,  # Will be true after first use
+            loaded=loaded,
             cache_path=model_path,
             model=embedding_config.model,
             dimension=embedding_config.dimension,
             device=embedding_config.device,
-            error=None
+            error=error
         )
 
     except Exception as e:

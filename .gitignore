@@ -90,3 +90,10 @@ backend/modules/providers_backup/
 
 # Misc scripts with potential secrets
 send_arxiv_email.py
+
+# AI-generated review reports (not part of source)
+AIE_FRAMEWORK_*.md
+CODE_REVIEW_REPORT.md
+
+# Superpowers plugin local state
+.superpowers/

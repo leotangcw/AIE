@@ -12,6 +12,8 @@
         >
           <span class="brand-ai">AI</span><span class="brand-e">E</span>
         </h1>
+        <div class="model-status-separator" />
+        <ModelStatusLights :models="taskStore.modelStatus" />
       </div>
       
       <div class="header-right">
@@ -37,6 +39,9 @@
             :is="action.icon"
             :size="20"
           />
+          <span v-if="action.id === 'teams' && teamsStore.runningAgentCount > 0" class="teams-badge">
+            {{ teamsStore.runningAgentCount }}
+          </span>
         </button>
         <div class="divider" />
         <LanguageSelector />
@@ -145,45 +150,52 @@
       </aside>
 
       <!-- 聊天区域 -->
-      <main
-        class="main"
-        @dragenter.prevent="handleMainDragEnter"
-        @dragover.prevent="handleMainDragOver"
-        @dragleave.prevent="handleMainDragLeave"
-        @drop.prevent="handleMainDrop"
-      >
-        <!-- 聊天内容区域 -->
-        <div class="chat-content">
-          <!-- 加载状态 -->
-          <div
-            v-if="isLoadingMessages"
-            class="loading-container"
-          >
-            <LoadingState
-              type="skeleton"
-              :lines="5"
+      <div class="chat-pane">
+        <main
+          class="main"
+          :style="teamsStore.teamsPanelOpen ? { flex: teamsStore.splitRatio, minWidth: '200px' } : {}"
+          @dragenter.prevent="handleMainDragEnter"
+          @dragover.prevent="handleMainDragOver"
+          @dragleave.prevent="handleMainDragLeave"
+          @drop.prevent="handleMainDrop"
+        >
+          <!-- 聊天内容区域 -->
+          <div class="chat-content">
+            <!-- 加载状态 -->
+            <div
+              v-if="isLoadingMessages"
+              class="loading-container"
+            >
+              <LoadingState
+                type="skeleton"
+                :lines="5"
+              />
+            </div>
+
+            <!-- 空状态 -->
+            <EmptyState
+              v-else-if="messages.length === 0"
+              icon="message-square"
+              :title="$t('chat.emptyTitle')"
+              :description="$t('chat.emptyDescription')"
+            />
+
+            <!-- 消息列表 (虚拟滚动) -->
+            <MessageList
+              v-else
+              ref="messageListRef"
+              :messages="messages"
+              :auto-scroll="true"
+              @regenerate="handleRegenerate"
+              @delete="handleDelete"
             />
           </div>
-
-          <!-- 空状态 -->
-          <EmptyState
-            v-else-if="messages.length === 0"
-            icon="message-square"
-            :title="$t('chat.emptyTitle')"
-            :description="$t('chat.emptyDescription')"
-          />
-
-          <!-- 消息列表 (虚拟滚动) -->
-          <MessageList
-            v-else
-            ref="messageListRef"
-            :messages="messages"
-            :auto-scroll="true"
-            @regenerate="handleRegenerate"
-            @delete="handleDelete"
-          />
+        </main>
+        <TeamsDivider v-if="teamsStore.teamsPanelOpen" v-model="teamsStore.splitRatio" />
+        <div v-if="teamsStore.teamsPanelOpen" class="sub-agents-wrapper" :style="{ flex: 1 - teamsStore.splitRatio }">
+          <SubAgentPanel />
         </div>
-      </main>
+      </div>
     </div>
 
     <!-- 输入区域 -->
@@ -433,7 +445,8 @@ import {
   Paperclip as PaperclipIcon,
   Plus as PlusIcon,
   Mic as MicIcon,
-  StopCircle as StopCircleIcon
+  StopCircle as StopCircleIcon,
+  Users as UsersIcon
 } from 'lucide-vue-next'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import LanguageSelector from '@/components/ui/LanguageSelector.vue'
@@ -454,13 +467,17 @@ import SystemSidebar from '@/modules/system/SystemSidebar.vue'
 import ExperiencePanel from '@/modules/experience/ExperiencePanel.vue'
 import TimelinePanel from './TimelinePanel.vue'
 import HeartbeatWidget from '@/modules/heartbeat/HeartbeatWidget.vue'
+import ModelStatusLights from '@/components/common/ModelStatusLights.vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/store/chat'
 import { useToolsStore } from '@/store/tools'
 import { useTaskStore } from '@/store/tasks'
+import { useTeamsStore } from '@/store/teams'
+import SubAgentPanel from '@/modules/teams/SubAgentPanel.vue'
+import TeamsDivider from '@/modules/teams/TeamsDivider.vue'
 import { useToast } from '@/composables/useToast'
 import { useKeyboard, commonShortcuts } from '@/composables/useKeyboard'
-import { toolsAPI, authAPI, todoAPI } from '@/api/endpoints'
+import { toolsAPI, authAPI, todoAPI, settingsAPI } from '@/api/endpoints'
 
 // 导入停止 API
 import { stopAPI } from '@/api/endpoints'
@@ -479,6 +496,20 @@ const { t } = useI18n()
 const chatStore = useChatStore()
 const taskStore = useTaskStore()
 const toolsStore = useToolsStore()
+const teamsStore = useTeamsStore()
+teamsStore.init()
+
+// Watch for team start requests — inject @team_name into chat input
+watch(() => teamsStore.pendingChatInput, (val) => {
+  if (val) {
+    nextTick(() => {
+      inputMessage.value = val
+      teamsStore.consumeChatInput()
+      textareaRef.value?.focus()
+      adjustHeight()
+    })
+  }
+})
 const toast = useToast()
 
 // 安全警告
@@ -963,6 +994,8 @@ function connectWebSocket(sessionId: string) {
             currentSubtask.value = null
           }, 1500)
         }
+      } else if (message.type?.startsWith('workflow_')) {
+        teamsStore.handleWorkflowEvent(message.type, message)
       } else if (message.type === 'error') {
         console.error('[ChatWindow] Error:', message.message)
         toast.error(message.message || '发生错误')
@@ -1270,6 +1303,7 @@ const headerActions = computed(() => [
   // { id: 'tools', icon: ToolsIcon, label: 'nav.tools', onClick: () => showPanel('tools') }, // 隐藏工具面板
   { id: 'memory', icon: BrainIcon, label: 'nav.memory', tooltip: 'nav.memoryTooltip', onClick: () => showPanel('memory') },
   { id: 'skills', icon: ZapIcon, label: 'nav.skills', tooltip: 'nav.skillsTooltip', onClick: () => showPanel('skills') },
+  { id: 'teams', icon: UsersIcon, label: 'nav.teams', tooltip: 'nav.teamsTooltip', onClick: () => teamsStore.toggleTeamsPanel() },
   { id: 'experience', icon: GraduationIcon, label: 'nav.experience', tooltip: 'nav.experienceTooltip', onClick: () => showPanel('experience') },
   // tasks 已移至左侧常驻显示
   { id: 'cron', icon: ClockIcon, label: 'nav.cron', tooltip: 'nav.cronTooltip', onClick: () => showPanel('cron') },
@@ -1964,6 +1998,29 @@ onMounted(async () => {
     if (chatStore.currentSessionId) {
       initializeChat(chatStore.currentSessionId)
     }
+
+    // Fetch initial model health status (main + sub) and embedder status
+    try {
+      const [modelStatus, embedderStatus] = await Promise.all([
+        settingsAPI.getModelStatus().catch(() => null),
+        settingsAPI.getEmbedderStatus().catch(() => null),
+      ])
+      const combined: Record<string, any> = { ...(modelStatus || {}) }
+      if (embedderStatus) {
+        combined.embedder = {
+          healthy: embedderStatus.loaded,
+          model_name: embedderStatus.model || '',
+          consecutive_failures: 0,
+          last_success: embedderStatus.loaded ? new Date().toISOString() : null,
+          last_failure: !embedderStatus.loaded ? embedderStatus.error || null : null,
+        }
+      }
+      if (Object.keys(combined).length > 0) {
+        taskStore.updateModelStatus(combined)
+      }
+    } catch {
+      // Non-critical, ignore errors
+    }
   } catch (error) {
     console.error('Failed to initialize:', error)
     toast.error(t('common.error'))
@@ -2026,6 +2083,14 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+}
+
+.model-status-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color, #e5e7eb);
+  margin: 0 var(--spacing-lg);
+  flex-shrink: 0;
 }
 
 .title {
@@ -3030,5 +3095,34 @@ onBeforeUnmount(() => {
   position: absolute;
   bottom: -2px;
   right: -4px;
+}
+
+.chat-pane {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.sub-agents-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  border-left: 1px solid var(--border-color, #222);
+  overflow: hidden;
+}
+
+.teams-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 9px;
+  background: var(--accent-color, #7c3aed);
+  color: white;
+  padding: 0 4px;
+  border-radius: 8px;
+  min-width: 14px;
+  text-align: center;
+  line-height: 16px;
 }
 </style>

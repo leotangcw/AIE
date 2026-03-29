@@ -77,6 +77,13 @@ class SubagentTask:
         self.executor = executor  # async def executor(progress_callback, cancel_check) -> dict
         self.estimated_duration = estimated_duration
 
+        # Workflow 模式扩展字段
+        self.system_prompt: str | None = None      # 工作流指定的自定义系统提示词
+        self.event_callback = None                  # 工作流事件回调 (async def(event, tool_name, data))
+        self.enable_skills: bool = False            # 是否启用技能系统
+        self.model_override: dict | None = None     # 模型覆盖配置
+        self.cancel_token = None                    # 取消令牌
+
         # 结果投递追踪
         self._result_delivered = False
 
@@ -387,6 +394,11 @@ class SubagentManager:
         timeout: int = None,
         parent_task_id: str | None = None,
         max_retries: int = 2,
+        system_prompt: str | None = None,
+        event_callback=None,
+        enable_skills: bool = False,
+        model_override: dict | None = None,
+        cancel_token=None,
     ) -> str:
         """创建新的 agent task"""
         task_id = str(uuid.uuid4())
@@ -401,6 +413,11 @@ class SubagentManager:
             parent_task_id=parent_task_id,
         )
         task.max_retries = max_retries
+        task.system_prompt = system_prompt
+        task.event_callback = event_callback
+        task.enable_skills = enable_skills
+        task.model_override = model_override
+        task.cancel_token = cancel_token
 
         self.tasks[task_id] = task
         task.add_event("created", {"label": label, "type": subagent_type.value})
@@ -868,7 +885,11 @@ class SubagentManager:
         """执行 agent task（完整 LLM agent loop）"""
         try:
             # 构建子 Agent 专用的系统提示词
-            system_prompt = self._build_subagent_prompt(task.message, task.subagent_type)
+            if task.system_prompt:
+                # 使用工作流指定的自定义系统提示词
+                system_prompt = task.system_prompt
+            else:
+                system_prompt = self._build_subagent_prompt(task.message, task.subagent_type)
 
             # 构建消息列表
             messages = [
@@ -936,8 +957,23 @@ class SubagentManager:
             iteration = 0
             max_iterations = 50 if task.subagent_type == SubagentType.LONG_RUNNING else 15
 
+            # 模型覆盖：工作流可指定使用不同的模型
+            model = self.model
+            if task.model_override:
+                override_model = task.model_override.get("model")
+                if override_model:
+                    model = override_model
+
+            # 取消检查函数
+            def _is_cancelled():
+                return bool(task.cancel_token and task.cancel_token.is_cancelled)
+
             while iteration < max_iterations:
                 iteration += 1
+
+                # 检查取消令牌
+                if _is_cancelled():
+                    raise asyncio.CancelledError("Task cancelled via cancel_token")
 
                 tool_definitions = tools.get_definitions()
 
@@ -947,12 +983,18 @@ class SubagentManager:
                 async for chunk in self.provider.chat_stream(
                     messages=messages,
                     tools=tool_definitions,
-                    model=self.model,
+                    model=model,
                     temperature=self.temperature,
                     max_tokens=self.max_tokens,
                 ):
                     if chunk.is_content and chunk.content:
                         content_buffer += chunk.content
+                        # 通过 event_callback 推送实时文本 chunk
+                        if task.event_callback:
+                            try:
+                                await task.event_callback("chunk", "", chunk.content)
+                            except Exception:
+                                pass
 
                     if chunk.is_tool_call and chunk.tool_call:
                         tool_calls_buffer.append(chunk.tool_call)
@@ -979,10 +1021,25 @@ class SubagentManager:
                     })
 
                     for tool_call in tool_calls_buffer:
+                        # 通过 event_callback 通知工具调用开始
+                        if task.event_callback:
+                            try:
+                                await task.event_callback("tool_call", tool_call.name, tool_call.arguments)
+                            except Exception:
+                                pass
+
                         result = await tools.execute(
                             tool_name=tool_call.name,
                             arguments=tool_call.arguments
                         )
+
+                        # 通过 event_callback 通知工具调用结果
+                        if task.event_callback:
+                            try:
+                                await task.event_callback("tool_result", tool_call.name, result)
+                            except Exception:
+                                pass
+
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tool_call.id,

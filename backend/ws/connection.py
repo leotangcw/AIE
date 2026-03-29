@@ -148,6 +148,8 @@ class ClientMessage(BaseModel):
 class ServerMessage(BaseModel):
     """服务器发送的消息基类"""
 
+    model_config = {"extra": "allow"}
+
     type: str = Field(..., description="消息类型")
 
     def to_json(self) -> str:

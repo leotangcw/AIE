@@ -193,6 +193,8 @@ class AgentLoop:
         if self.tools:
             self.tools.set_session_id(session_id)
             self.tools.set_channel(channel)
+            if cancel_token:
+                self.tools.set_cancel_token(cancel_token)
 
             spawn_tool = self.tools.get_tool("spawn")
             if spawn_tool and hasattr(spawn_tool, "set_context"):

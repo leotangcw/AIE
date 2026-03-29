@@ -80,14 +80,25 @@ async def upload_file(
             detail=f"文件大小超过限制 ({MAX_FILE_SIZE // 1024 // 1024}MB)",
         )
 
-    # 生成唯一文件名
-    ext = Path(file.filename).suffix or ""
+    # 读取文件内容并验证实际类型（magic bytes）
+    content = await file.read()
+
+    # 通过文件头 magic bytes 验证真实文件类型
+    actual_type = _detect_mime_type(content)
+    if actual_type and actual_type != content_type:
+        logger.warning(f"File type mismatch: claimed={content_type}, detected={actual_type}, filename={file.filename}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"文件内容与声明类型不匹配: 声称 {content_type}，实际为 {actual_type}",
+        )
+
+    # 生成唯一文件名（使用实际检测到的类型决定扩展名，防止伪造扩展名）
+    ext = _get_safe_extension(content_type)
     unique_name = f"{uuid.uuid4().hex}{ext}"
     file_path = UPLOAD_DIR / unique_name
 
     try:
         # 保存文件
-        content = await file.read()
         with open(file_path, "wb") as f:
             f.write(content)
 
@@ -107,3 +118,117 @@ async def upload_file(
     except Exception as e:
         logger.error(f"文件上传失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# 文件类型检测工具函数（基于 magic bytes，无外部依赖）
+# ---------------------------------------------------------------------------
+
+# 常见文件头签名 → MIME 类型
+_MAGIC_SIGNATURES: list[tuple[bytes, str]] = [
+    # 图片
+    (b"\xff\xd8\xff", "image/jpeg"),
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
+    (b"GIF87a", "image/gif"),
+    (b"GIF89a", "image/gif"),
+    (b"RIFF", "image/webp"),  # RIFF....WEBP
+    (b"BM", "image/bmp"),
+    (b"II*\x00", "image/tiff"),  # little-endian TIFF
+    (b"MM\x00*", "image/tiff"),  # big-endian TIFF
+    # 音频
+    (b"\xff\xfb", "audio/mpeg"),
+    (b"\xff\xf3", "audio/mpeg"),
+    (b"\xff\xf2", "audio/mpeg"),
+    (b"ID3", "audio/mpeg"),
+    (b"fLaC", "audio/flac"),  # FLAC (不在白名单但检测到)
+    (b"RIFF", "audio/wav"),  # RIFF....WAVE
+    (b"\x4f\x67\x67\x53", "audio/ogg"),
+    # 视频
+    (b"\x00\x00\x00\x18ftypmp42", "video/mp4"),
+    (b"\x00\x00\x00\x1cftypisom", "video/mp4"),
+    (b"\x00\x00\x00\x20ftypisom", "video/mp4"),
+    (b"\x00\x00\x00", "video/mp4"),  # 通用 MP4 ftyp box
+    (b"RIFF", "video/avi"),  # RIFF....AVI
+]
+
+
+def _detect_mime_type(data: bytes) -> str | None:
+    """通过文件头 magic bytes 检测真实 MIME 类型。"""
+    if not data or len(data) < 4:
+        return None
+
+    # JPEG / PNG / GIF / BMP / TIFF 等图片
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if data[:2] == b"BM":
+        return "image/bmp"
+    if data[:4] == b"II*\x00" or data[:4] == b"MM\x00*":
+        return "image/tiff"
+
+    # RIFF 容器: WebP / WAV / AVI
+    if data[:4] == b"RIFF" and len(data) >= 12:
+        riff_type = data[8:12]
+        if riff_type == b"WEBP":
+            return "image/webp"
+        elif riff_type == b"WAVE":
+            return "audio/wav"
+        elif riff_type == b"AVI ":
+            return "video/avi"
+
+    # MP3 (ID3 tag or sync word)
+    if data[:3] == b"ID3":
+        return "audio/mpeg"
+    if data[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
+        return "audio/mpeg"
+
+    # OGG
+    if data[:4] == b"\x4f\x67\x67\x53":
+        return "audio/ogg"
+
+    # MP4 / MOV / M4A (ftyp box)
+    if data[:4] == b"\x00\x00\x00" and len(data) >= 12 and data[4:8] == b"ftyp":
+        brand = data[8:12]
+        if brand in (b"isom", b"mp42", b"mp41", b"M4V ", b"iso2", b"avc1"):
+            return "video/mp4"
+        if brand == b"M4A " or brand == b"isom":
+            # M4A 和部分 isom 也可能是音频
+            if data[:4] == b"\x00\x00\x00":
+                return "audio/m4a"
+        return "video/mp4"
+
+    # WebM (Matroska / EBML)
+    if data[:4] == b"\x1a\x45\xdf\xa3":
+        return "video/webm"
+
+    return None
+
+
+# MIME 类型 → 安全扩展名映射
+_SAFE_EXTENSIONS: dict[str, str] = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "image/bmp": ".bmp",
+    "image/tiff": ".tiff",
+    "audio/mpeg": ".mp3",
+    "audio/mp3": ".mp3",
+    "audio/wav": ".wav",
+    "audio/ogg": ".ogg",
+    "audio/m4a": ".m4a",
+    "audio/webm": ".weba",
+    "video/mp4": ".mp4",
+    "video/avi": ".avi",
+    "video/mov": ".mov",
+    "video/mkv": ".mkv",
+    "video/webm": ".webm",
+}
+
+
+def _get_safe_extension(content_type: str) -> str:
+    """根据声明类型返回安全扩展名，不信任用户上传的文件名扩展名。"""
+    return _SAFE_EXTENSIONS.get(content_type, "")

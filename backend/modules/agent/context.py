@@ -61,6 +61,11 @@ class ContextBuilder:
             except Exception as e:
                 logger.warning(f"Failed to load skills: {e}")
         
+        # Add active teams section
+        teams_section = self._get_active_teams_section()
+        if teams_section:
+            parts.append(teams_section)
+
         system_prompt = "\n\n---\n\n".join(parts)
         logger.debug(f"System prompt built: {len(system_prompt)} characters")
         
@@ -234,6 +239,56 @@ class ContextBuilder:
         
         return identity
 
+    def _get_active_teams_section(self) -> str:
+        """Build system prompt section listing active agent teams."""
+        try:
+            from backend.database import SessionLocal
+            from backend.models.agent_team import AgentTeam
+            from sqlalchemy import select
+
+            with SessionLocal() as session:
+                result = session.execute(
+                    select(AgentTeam).where(AgentTeam.is_active == True).order_by(AgentTeam.name)  # noqa: E712
+                )
+                teams = result.scalars().all()
+        except Exception:
+            return ""
+
+        if not teams:
+            return ""
+
+        lines = ["## 可用团队\n", "当前激活的团队（在消息中 @团队名 可调用）：\n"]
+        for team in teams:
+            agents = team.agents or []
+            member_summary = ", ".join(
+                a.get("role", a.get("id", "?")) for a in agents
+            )
+            lines.append(f"### {team.name} ({team.mode})\n")
+            lines.append(f"- 成员: {member_summary}\n")
+        return "\n".join(lines)
+
+    def _find_mentioned_team(self, user_message: str) -> str | None:
+        """Scan user message for @team_name or 使用[team_name] mentions."""
+        try:
+            from backend.database import SessionLocal
+            from backend.models.agent_team import AgentTeam
+            from sqlalchemy import select
+
+            with SessionLocal() as session:
+                result = session.execute(
+                    select(AgentTeam).where(AgentTeam.is_active == True)  # noqa: E712
+                )
+                teams = result.scalars().all()
+        except Exception:
+            return None
+
+        for team in teams:
+            if f"@{team.name}" in user_message or f"@{team.name.lower()}" in user_message:
+                return team.name
+            if f"使用{team.name}" in user_message or f"使用[{team.name}]" in user_message:
+                return team.name
+        return None
+
     def build_messages(
         self,
         history: list[dict[str, Any]],
@@ -257,6 +312,20 @@ class ContextBuilder:
         
         messages.append({"role": "system", "content": system_prompt})
         messages.extend(history)
+
+        # Check for team mention
+        mentioned_team = self._find_mentioned_team(current_message)
+        if mentioned_team:
+            messages.append({
+                "role": "system",
+                "content": f"检测到用户提及团队「{mentioned_team}」，你必须立即调用 workflow_run 工具来使用该团队处理当前任务。"
+                            f"\n\n调用格式：workflow_run(team_name=\"{mentioned_team}\", goal=\"用户任务的完整描述\")"
+                            f"\n\n注意："
+                            f"\n1. 直接调用 workflow_run，不要询问用户是否需要使用团队"
+                            f"\n2. goal 参数必须是用户想要完成的实际任务描述，不是简单的关键词"
+                            f"\n3. 不要解释你即将调用工具，直接调用即可"
+                            "\n4. 如果调用失败，向用户报告错误原因"
+            })
 
         # 添加关键提醒到用户消息（这些指令比系统提示词更可能被遵守）
         critical_reminder = """

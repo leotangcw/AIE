@@ -102,6 +102,8 @@
         "tools": "Tools",
         "memory": "Memory Bank",
         "skills": "Skills Library",
+        "teams": "Teams",
+        "teamsTooltip": "View and manage multi-agent teams",
         "experience": "Experience",
         "cron": "Scheduler",
         "heartbeat": "Heartbeat Monitor",
@@ -1450,5 +1452,42 @@
     "todo": {
         "title": "Todo List",
         "empty": "No tasks yet"
+    },
+    "teams": {
+        "title": "Teams",
+        "running": "Running",
+        "manage": "Manage",
+        "createTeam": "Create Team",
+        "editTeam": "Edit Team",
+        "deleteTeam": "Delete Team",
+        "confirmDelete": "Delete team \"{name}\"?",
+        "noWorkflow": "No active workflow",
+        "noWorkflowHint": "Mention a team with @team_name or use workflow_run tool",
+        "noTeams": "No teams yet. Click above to create one.",
+        "mode": {
+            "pipeline": "Pipeline (Sequential)",
+            "graph": "Graph (DAG)",
+            "council": "Council (Deliberation)"
+        },
+        "status": {
+            "queued": "Queued",
+            "running": "Running",
+            "waiting": "Waiting",
+            "completed": "Completed",
+            "error": "Error"
+        },
+        "agents": "{count} members",
+        "skillInjection": "Enable skill injection",
+        "crossReview": "Cross review",
+        "teamName": "Team name",
+        "modeLabel": "Orchestration mode",
+        "memberList": "Member list",
+        "addMember": "Add member",
+        "role": "Role",
+        "task": "Task description",
+        "systemPrompt": "System prompt",
+        "perspective": "Perspective",
+        "dependsOn": "Depends on",
+        "condition": "Condition"
     }
 }

@@ -113,6 +113,18 @@ def register_all_tools(
         except Exception as e:
             logger.error(f"Failed to register spawn tool: {e}")
 
+        # 4b. 注册 Workflow 工具（如果提供了 SubagentManager）
+        try:
+            from backend.modules.tools.workflow_tool import WorkflowTool
+
+            workflow_tool = WorkflowTool(subagent_manager, skills=skills_loader)
+            if session_id:
+                workflow_tool.set_session_id(session_id)
+            tools.register(workflow_tool)
+            logger.debug("Registered workflow tool")
+        except Exception as e:
+            logger.error(f"Failed to register workflow tool: {e}")
+
         # 4.5 注册后台任务工具（run_background + check_task）
         try:
             from backend.modules.tools.background_tools import RunBackgroundTool, CheckTaskTool

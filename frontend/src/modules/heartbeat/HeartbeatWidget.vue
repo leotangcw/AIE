@@ -94,7 +94,10 @@ const statusText = computed(() => {
   return t('heartbeat.statusIdle')
 })
 
-const displayTasks = computed(() => tasks.value.slice(0, 3))
+const displayTasks = computed(() => {
+  const filtered = tasks.value.filter(t => t.task_type !== 'HEALTH_CHECK' && t.task_type !== 'METRIC_COLLECT')
+  return filtered.slice(0, 3)
+})
 
 // Methods
 function formatNum(n: number): string {

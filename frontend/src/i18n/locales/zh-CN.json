@@ -104,6 +104,8 @@
         "tools": "工具",
         "memory": "记忆库",
         "skills": "技能库",
+        "teams": "团队",
+        "teamsTooltip": "查看和管理多 Agent 团队",
         "experience": "经验学习",
         "tasks": "任务看板",
         "cron": "定时任务",
@@ -1490,5 +1492,42 @@
     "todo": {
         "title": "待办事项",
         "empty": "暂无待办事项"
+    },
+    "teams": {
+        "title": "团队",
+        "running": "运行中",
+        "manage": "管理",
+        "createTeam": "创建团队",
+        "editTeam": "编辑团队",
+        "deleteTeam": "删除团队",
+        "confirmDelete": "确定删除团队「{name}」？",
+        "noWorkflow": "暂无运行中的工作流",
+        "noWorkflowHint": "通过 @团队名 调用团队，或使用 workflow_run 工具",
+        "noTeams": "暂无团队，点击上方按钮创建",
+        "mode": {
+            "pipeline": "Pipeline（顺序执行）",
+            "graph": "Graph（DAG 依赖图）",
+            "council": "Council（多角度讨论）"
+        },
+        "status": {
+            "queued": "排队中",
+            "running": "运行中",
+            "waiting": "等待中",
+            "completed": "已完成",
+            "error": "失败"
+        },
+        "agents": "{count} 成员",
+        "skillInjection": "启用技能注入",
+        "crossReview": "交叉审阅",
+        "teamName": "团队名称",
+        "modeLabel": "编排模式",
+        "memberList": "成员列表",
+        "addMember": "添加成员",
+        "role": "角色",
+        "task": "任务描述",
+        "systemPrompt": "系统提示词",
+        "perspective": "视角",
+        "dependsOn": "依赖 Agent",
+        "condition": "条件"
     }
 }
