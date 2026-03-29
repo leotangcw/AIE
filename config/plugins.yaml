@@ -17,6 +17,29 @@ plugins:
       vector_model: "bge-small-zh-v1.5"
       embedding_batch_size: 32
 
+  # SuperWorkers 企业工作流插件（默认关闭）
+  superworkers:
+    enabled: false
+    options:
+      workflow:
+        local_skill_check: true
+        enterprise_search: true
+        web_search_fallback: true
+      knowledge_priority:
+        - local_skills
+        - knowledge_hub
+        - graph_rag
+        - web_search
+      trace:
+        enabled: true
+        local_retain_days: 30
+        remote_storage: null
+        auto_cleanup: true
+        cleanup_interval_hours: 24
+      evolution:
+        min_traces_for_distill: 5
+        require_human_review: true
+
   # 记忆系统插件（默认开启）
   memory:
     enabled: true

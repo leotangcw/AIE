@@ -1,5 +1,24 @@
 <template>
   <div class="knowledge-search-system">
+    <!-- 企业规章制度 -->
+    <div class="regulations-card" @click="scrollToRegulationSource">
+      <div class="regulations-icon">
+        <ShieldCheck :size="28" />
+      </div>
+      <div class="regulations-info">
+        <h4>{{ $t('knowledgeSearch.regulations.title') }}</h4>
+        <p>{{ $t('knowledgeSearch.regulations.description') }}</p>
+      </div>
+      <div class="regulations-status">
+        <span v-if="regulationSource" class="status-badge ready">
+          {{ $t('knowledgeSearch.regulations.ready') }}
+        </span>
+        <span v-else class="status-badge empty">
+          {{ $t('knowledgeSearch.regulations.notCreated') }}
+        </span>
+      </div>
+    </div>
+
     <!-- Section 1: Knowledge Source Management -->
     <div class="source-section">
       <div class="section-header">
@@ -25,15 +44,19 @@
 
         <!-- Source cards -->
         <div v-else class="sources-grid">
-          <KnowledgeSourceCard
+          <div
             v-for="source in sources"
             :key="source.id"
-            :source="source"
-            @toggle="toggleSource"
-            @upload="uploadDocument"
-            @delete="deleteSource"
-            @sync="syncSource"
-          />
+            :data-source-id="source.id"
+          >
+            <KnowledgeSourceCard
+              :source="source"
+              @toggle="toggleSource"
+              @upload="uploadDocument"
+              @delete="deleteSource"
+              @sync="syncSource"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -155,10 +178,8 @@
         <label>{{ $t('knowledgeSearch.sourceType') }}</label>
         <select v-model="newSource.source_type">
           <option value="local">{{ $t('knowledgeSearch.typeLocal') }}</option>
-          <option value="wiki">{{ $t('knowledgeSearch.typeWiki') }}</option>
           <option value="database">{{ $t('knowledgeSearch.typeDatabase') }}</option>
-          <option value="api">{{ $t('knowledgeSearch.typeApi') }}</option>
-          <option value="web">{{ $t('knowledgeSearch.typeWeb') }}</option>
+          <option value="web_search">{{ $t('knowledgeSearch.typeWebSearch') }}</option>
         </select>
       </div>
 
@@ -166,13 +187,26 @@
       <div v-if="newSource.source_type === 'local'" class="form-group">
         <label>{{ $t('knowledgeSearch.localPath') }}</label>
         <div class="path-input-group">
-          <input v-model="newSource.config.path" type="text" :placeholder="$t('knowledgeSearch.localPathPlaceholder')" readonly />
-          <button class="btn secondary" @click="selectFolder">
+          <input v-model="newSource.config.path" type="text" :placeholder="$t('knowledgeSearch.localPathPlaceholder')" />
+          <button class="btn secondary" @click="browseServerDirectory" :disabled="browsingDir">
             <FolderOpen :size="16" />
-            {{ $t('knowledgeSearch.browse') }}
+            {{ browsingDir ? '...' : $t('knowledgeSearch.browse') }}
           </button>
         </div>
         <p class="path-hint">{{ $t('knowledgeSearch.pathHint') }}</p>
+        <!-- Directory browsing results -->
+        <div v-if="browseResults.length > 0" class="browse-results">
+          <div
+            v-for="entry in browseResults"
+            :key="entry.path"
+            class="browse-entry"
+            @click="selectBrowsePath(entry)"
+          >
+            <component :is="entry.is_dir ? FolderOpen : FileText" :size="14" />
+            <span>{{ entry.name }}</span>
+            <span v-if="entry.is_dir" class="browse-dir">/</span>
+          </div>
+        </div>
       </div>
 
       <template #footer>
@@ -189,27 +223,19 @@
       style="display: none"
       @change="handleFileUpload"
     />
-
-    <!-- Folder Picker Input -->
-    <input
-      ref="folderInput"
-      type="file"
-      webkitdirectory
-      style="display: none"
-      @change="handleFolderSelect"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   Plus as PlusIcon,
-  FolderOpen
+  FolderOpen,
+  FileText,
+  ShieldCheck
 } from 'lucide-vue-next'
-import knowledgeApi, { type KnowledgeSource } from '@/api/knowledge'
-import knowledgeHubApi, { type KnowledgeHubConfig } from '@/api/knowledgeHub'
+import knowledgeHubApi, { type KnowledgeHubConfig, type SourceConfig } from '@/api/knowledgeHub'
 import { useToast } from '@/composables/useToast'
 import { EmptyState, Modal, ToggleSwitch } from '@/components/ui'
 import KnowledgeSourceCard from '@/components/knowledge/KnowledgeSourceCard.vue'
@@ -220,7 +246,7 @@ const toast = useToast()
 // =====================
 // Source Management
 // =====================
-const sources = ref<KnowledgeSource[]>([])
+const sources = ref<SourceConfig[]>([])
 const showCreateDialog = ref(false)
 const newSource = ref({
   name: '',
@@ -230,12 +256,50 @@ const newSource = ref({
   }
 })
 const fileInput = ref<HTMLInputElement | null>(null)
-const folderInput = ref<HTMLInputElement | null>(null)
 const uploadingSourceId = ref<string | null>(null)
+
+// Server directory browsing
+const browsingDir = ref(false)
+const browseResults = ref<Array<{name: string, path: string, is_dir: boolean}>>([])
+
+// =====================
+// Regulations Source
+// =====================
+const regulationSource = computed(() => {
+  return sources.value.find(s => s.tags && s.tags.includes('regulations'))
+})
+
+const scrollToRegulationSource = async () => {
+  if (regulationSource.value) {
+    // Already exists, scroll to its card
+    const el = document.querySelector(`[data-source-id="${regulationSource.value.id}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('highlight-pulse')
+      setTimeout(() => el.classList.remove('highlight-pulse'), 2000)
+    }
+    return
+  }
+  // Create the regulations knowledge source
+  try {
+    await knowledgeHubApi.createSource({
+      name: t('knowledgeSearch.regulations.title'),
+      source_type: 'local',
+      config: {},
+      description: t('knowledgeSearch.regulations.description'),
+      tags: ['regulations'],
+    })
+    toast.success(t('knowledgeSearch.regulations.created'))
+    await loadSources()
+  } catch (error) {
+    console.error('Failed to create regulations source:', error)
+    toast.error(t('knowledgeSearch.createError'))
+  }
+}
 
 const loadSources = async () => {
   try {
-    sources.value = await knowledgeApi.getSources()
+    sources.value = await knowledgeHubApi.getSources()
   } catch (error) {
     console.error('Failed to load sources:', error)
     toast.error(t('knowledgeSearch.loadError'))
@@ -247,70 +311,37 @@ const createSource = async () => {
     toast.error(t('knowledgeSearch.createError'))
     return
   }
-  // 本地文档类型需要目录路径
   if (newSource.value.source_type === 'local' && !newSource.value.config.path?.trim()) {
     toast.error(t('knowledgeSearch.createError'))
     return
   }
   try {
-    const config = newSource.value.source_type === 'local'
-      ? { path: newSource.value.config.path }
-      : {}
-    await knowledgeApi.createSource(newSource.value.name, newSource.value.source_type, config)
+    await knowledgeHubApi.createSource({
+      name: newSource.value.name,
+      source_type: newSource.value.source_type,
+      config: newSource.value.source_type === 'local'
+        ? { path: newSource.value.config.path }
+        : {},
+      local: newSource.value.source_type === 'local'
+        ? { path: newSource.value.config.path }
+        : undefined,
+    })
     toast.success(t('knowledgeSearch.createSuccess'))
     await loadSources()
     showCreateDialog.value = false
     newSource.value = { name: '', source_type: 'local', config: { path: '' } }
+    browseResults.value = []
   } catch (error) {
     console.error('Failed to create source:', error)
     toast.error(t('knowledgeSearch.createError'))
   }
 }
 
-const selectFolder = () => {
-  folderInput.value?.click()
-}
-
-const handleFolderSelect = async (event: Event) => {
-  const target = event.target as HTMLInputElement
-  const files = target.files
-  if (!files || files.length === 0) return
-
-  // Get the first selected item's path (webkitRelativePath contains the directory)
-  const firstFile = files[0]
-  let folderPath = ''
-
-  // Try to get path from webkitRelativePath (format: "folder_name/file.txt")
-  if (firstFile.webkitRelativePath) {
-    const parts = firstFile.webkitRelativePath.split('/')
-    if (parts.length > 0) {
-      // Get the directory path from the first file
-      // We need to find the common parent directory
-      const dirParts = parts.slice(0, -1)
-      if (dirParts.length > 0) {
-        folderPath = dirParts.join('/')
-      }
-    }
-  }
-
-  // Fallback: construct path from the File object's name and the relative path
-  // For security reasons, browsers may not expose full paths, but we try our best
-  if (!folderPath && firstFile.webkitRelativePath) {
-    folderPath = firstFile.webkitRelativePath.replace(/\/[^\/]+$/, '')
-  }
-
-  // Update the path in newSource
-  newSource.value.config.path = folderPath || firstFile.name
-
-  // Reset input
-  target.value = ''
-}
-
 const deleteSource = async (id: string) => {
   if (!confirm(t('knowledgeSearch.confirmDelete'))) return
 
   try {
-    await knowledgeApi.deleteSource(id)
+    await knowledgeHubApi.deleteSource(id)
     sources.value = sources.value.filter(s => s.id !== id)
     toast.success(t('knowledgeSearch.deleteSuccess'))
   } catch (error) {
@@ -322,7 +353,7 @@ const deleteSource = async (id: string) => {
 const syncSource = async (sourceId: string) => {
   try {
     const result = await knowledgeHubApi.syncSource(sourceId)
-    toast.success(t('knowledgeSearch.syncSuccess'))
+    toast.success(t('knowledgeSearch.syncSuccess') + ` (${result.chunks_count || 0} chunks)`)
     await loadSources()
   } catch (error: any) {
     console.error('Failed to sync source:', error)
@@ -331,9 +362,15 @@ const syncSource = async (sourceId: string) => {
   }
 }
 
-const toggleSource = async (source: KnowledgeSource) => {
-  // Toggle is handled by backend - just reload
-  await loadSources()
+const toggleSource = async (source: SourceConfig) => {
+  try {
+    await knowledgeHubApi.updateSource(source.id, { enabled: !source.enabled })
+    source.enabled = !source.enabled
+  } catch (error) {
+    console.error('Failed to toggle source:', error)
+    toast.error(t('knowledgeSearch.toggleError'))
+    await loadSources()
+  }
 }
 
 const uploadDocument = (sourceId: string) => {
@@ -347,7 +384,7 @@ const handleFileUpload = async (event: Event) => {
   if (!file || !uploadingSourceId.value) return
 
   try {
-    const result = await knowledgeApi.addDocument(uploadingSourceId.value, file)
+    const result = await knowledgeHubApi.addDocument(uploadingSourceId.value, file)
     toast.success(t('knowledgeSearch.uploadSuccess', { count: result.chunks_added }))
     await loadSources()
   } catch (error) {
@@ -358,6 +395,33 @@ const handleFileUpload = async (event: Event) => {
   // Reset
   target.value = ''
   uploadingSourceId.value = null
+}
+
+// =====================
+// Server Directory Browsing
+// =====================
+const browseServerDirectory = async () => {
+  const currentPath = newSource.value.config.path || '/'
+  browsingDir.value = true
+  try {
+    browseResults.value = await knowledgeHubApi.browseDirectory(currentPath)
+  } catch (error: any) {
+    const detail = error?.response?.data?.detail || error?.message
+    if (detail?.includes('not found') || detail?.includes('404')) {
+      browseResults.value = []
+    } else {
+      console.error('Failed to browse directory:', error)
+    }
+  } finally {
+    browsingDir.value = false
+  }
+}
+
+const selectBrowsePath = (entry: {name: string, path: string, is_dir: boolean}) => {
+  if (entry.is_dir) {
+    newSource.value.config.path = entry.path
+    browseResults.value = []
+  }
 }
 
 // =====================
@@ -378,7 +442,8 @@ const config = ref<KnowledgeHubConfig>({
   cache: {
     enabled: true,
     ttl: 3600,
-    max_memory_items: 100
+    max_memory_items: 100,
+    cache_queries: true
   },
   sources: [],
   storage_dir: 'memory/knowledge_hub'
@@ -461,6 +526,86 @@ onMounted(async () => {
   padding: 16px;
 }
 
+/* Regulations Card */
+.regulations-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(37, 99, 235, 0.1) 100%);
+  border: 1px solid var(--color-primary);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.regulations-card:hover {
+  border-color: var(--color-primary-hover, #2563eb);
+  box-shadow: 0 2px 12px rgba(59, 130, 246, 0.15);
+}
+
+.regulations-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: var(--color-primary);
+  color: white;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.regulations-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.regulations-info h4 {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.regulations-info p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.regulations-status {
+  flex-shrink: 0;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.ready {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+
+.status-badge.empty {
+  background: rgba(156, 163, 175, 0.1);
+  color: #6b7280;
+}
+
+/* Highlight pulse for scroll target */
+@keyframes highlight-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.1); }
+}
+
+.highlight-pulse {
+  animation: highlight-pulse 0.8s ease 2;
+}
+
 /* Section Headers */
 .section-header {
   display: flex;
@@ -533,114 +678,6 @@ onMounted(async () => {
   gap: 16px;
 }
 
-.source-card {
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border-primary);
-  border-radius: 8px;
-  overflow: hidden;
-  transition: all 0.2s;
-}
-
-.source-card:hover {
-  border-color: var(--color-border-secondary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.source-card.disabled {
-  opacity: 0.6;
-}
-
-.source-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border-bottom: 1px solid var(--color-border-primary);
-}
-
-.source-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  border-radius: 8px;
-}
-
-.source-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.source-name {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--color-text-primary);
-  margin: 0 0 4px 0;
-}
-
-.source-type-badge {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-tertiary);
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.source-body {
-  padding: 16px;
-}
-
-.source-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-}
-
-.source-footer {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 16px;
-  background: var(--color-bg-secondary);
-  border-top: 1px solid var(--color-border-primary);
-}
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border-primary);
-  border-radius: 4px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.action-btn:hover {
-  background: var(--color-bg-tertiary);
-  border-color: var(--color-border-secondary);
-  color: var(--color-text-primary);
-}
-
-.action-btn.danger:hover {
-  background: var(--color-error-light);
-  border-color: var(--color-error);
-  color: var(--color-error);
-}
-
 /* Config Section */
 .config-section {
   background: var(--color-bg-primary);
@@ -706,6 +743,36 @@ onMounted(async () => {
   margin-top: 6px;
   font-size: 12px;
   color: var(--color-text-tertiary);
+}
+
+/* Directory browsing */
+.browse-results {
+  margin-top: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+}
+
+.browse-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.browse-entry:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.browse-dir {
+  color: var(--color-text-tertiary);
+  margin-left: auto;
 }
 
 .toggle-label {

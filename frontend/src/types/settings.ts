@@ -76,7 +76,7 @@ export interface Settings {
     fontSize: 'small' | 'medium' | 'large'
 }
 
-export type SettingsTab = 'models' | 'persona' | 'workspace' | 'security' | 'channels' | 'rules'
+export type SettingsTab = 'models' | 'persona' | 'workspace' | 'security' | 'channels'
 
 export interface EmbeddingConfig {
     model: string

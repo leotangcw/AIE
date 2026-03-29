@@ -7,10 +7,7 @@
 // =====================
 export const SourceType = {
   LOCAL: 'local',
-  WIKI: 'wiki',
   DATABASE: 'database',
-  API: 'api',
-  WEB: 'web',
   WEB_SEARCH: 'web_search'
 } as const
 
@@ -23,7 +20,8 @@ export const RetrievalMode = {
   DIRECT: 'direct',
   VECTOR: 'vector',
   LLM: 'llm',
-  HYBRID: 'hybrid'
+  HYBRID: 'hybrid',
+  GRAPH: 'graph'
 } as const
 
 export type RetrievalMode = typeof RetrievalMode[keyof typeof RetrievalMode]

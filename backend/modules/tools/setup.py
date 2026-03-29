@@ -21,10 +21,11 @@ def register_all_tools(
     channel_manager=None,
     session_manager=None,
     memory_store=None,
+    knowledge_hub=None,
 ) -> ToolRegistry:
     """
     注册所有可用工具
-    
+
     Args:
         workspace: 工作空间路径
         command_timeout: 命令超时时间（秒）
@@ -40,6 +41,7 @@ def register_all_tools(
         channel_manager: ChannelManager 实例（可选）
         session_manager: SessionManager 实例（可选）
         memory_store: MemoryStore 实例（可选，用于记忆工具）
+        knowledge_hub: KnowledgeHub 实例（可选，用于知识库工具）
         
     Returns:
         ToolRegistry: 已注册所有工具的注册表
@@ -223,6 +225,22 @@ def register_all_tools(
         logger.debug("Registered vector memory tools")
     except Exception as e:
         logger.warning(f"Failed to register vector memory tools: {e}")
+
+    # 9.5 注册知识库工具（KnowledgeHub）
+    if knowledge_hub is not None:
+        try:
+            from backend.modules.tools.knowledge import (
+                KnowledgeRetrieveTool,
+                KnowledgeQueryDBTool,
+                KnowledgeListSourcesTool,
+            )
+
+            tools.register(KnowledgeRetrieveTool(knowledge_hub))
+            tools.register(KnowledgeQueryDBTool(knowledge_hub))
+            tools.register(KnowledgeListSourcesTool(knowledge_hub))
+            logger.debug("Registered knowledge hub tools")
+        except Exception as e:
+            logger.error(f"Failed to register knowledge hub tools: {e}")
 
     # 10. 注册多模态生成工具（图像生成、TTS、视频理解、音乐生成、视频生成）
     def _resolve_model_type(model_config, provider_id: str | None) -> str | None:

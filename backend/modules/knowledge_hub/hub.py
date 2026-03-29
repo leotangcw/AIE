@@ -255,7 +255,7 @@ class KnowledgeHub:
 
         return await connector.execute_query(question)
 
-    def add_source(self, source: SourceConfig) -> bool:
+    async def add_source(self, source: SourceConfig) -> bool:
         """添加知识源
 
         Args:
@@ -266,10 +266,7 @@ class KnowledgeHub:
         """
         try:
             # 创建连接器
-            import asyncio
-            connector = asyncio.get_event_loop().run_until_complete(
-                self._create_connector(source)
-            )
+            connector = await self._create_connector(source)
 
             if connector:
                 self.connectors[source.id] = connector
@@ -284,7 +281,7 @@ class KnowledgeHub:
             logger.error(f"Failed to add source {source.id}: {e}")
             return False
 
-    def remove_source(self, source_id: str) -> bool:
+    async def remove_source(self, source_id: str) -> bool:
         """移除知识源
 
         Args:
@@ -296,8 +293,7 @@ class KnowledgeHub:
         if source_id in self.connectors:
             connector = self.connectors.pop(source_id)
             if hasattr(connector, "disconnect"):
-                import asyncio
-                asyncio.get_event_loop().run_until_complete(connector.disconnect())
+                await connector.disconnect()
             logger.info(f"Removed knowledge source: {source_id}")
             return True
 

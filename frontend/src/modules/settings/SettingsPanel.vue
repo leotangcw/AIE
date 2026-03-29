@@ -107,15 +107,6 @@
           >
             <ChannelsConfig />
           </div>
-
-          <!-- Rules Configuration -->
-          <div
-            v-else-if="activeTab === 'rules'"
-            key="rules"
-            class="tab-pane"
-          >
-            <RulesConfig />
-          </div>
         </transition>
       </div>
 
@@ -147,8 +138,7 @@ import {
   User as UserIcon,
   FolderOpen as FolderIcon,
   Shield as ShieldIcon,
-  MessageSquare as MessageIcon,
-  FileCode as FileCodeIcon
+  MessageSquare as MessageIcon
 } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import ModelsPanel from './ModelsPanel.vue'
@@ -157,7 +147,6 @@ import PersonalityEditor from './PersonalityEditor.vue'
 import WorkspaceConfig from './WorkspaceConfig.vue'
 import SecurityConfig from './SecurityConfig.vue'
 import ChannelsConfig from './ChannelsConfig.vue'
-import RulesConfig from './RulesConfig.vue'
 import { useSettingsStore } from '@/store/settings'
 import { useToast } from '@/composables/useToast'
 import type { SettingsTab } from '@/types/settings'
@@ -175,8 +164,7 @@ const tabs = [
   { id: 'persona' as SettingsTab, icon: UserIcon, label: 'settings.tabs.persona', shortLabel: 'settings.tabShort.persona' },
   { id: 'workspace' as SettingsTab, icon: FolderIcon, label: 'settings.tabs.workspace', shortLabel: 'settings.tabShort.workspace' },
   { id: 'security' as SettingsTab, icon: ShieldIcon, label: 'settings.tabs.security', shortLabel: 'settings.tabShort.security' },
-  { id: 'channels' as SettingsTab, icon: MessageIcon, label: 'settings.tabs.channels', shortLabel: 'settings.tabShort.channels' },
-  { id: 'rules' as SettingsTab, icon: FileCodeIcon, label: 'settings.tabs.rules', shortLabel: 'settings.tabShort.rules' }
+  { id: 'channels' as SettingsTab, icon: MessageIcon, label: 'settings.tabs.channels', shortLabel: 'settings.tabShort.channels' }
 ]
 
 const emit = defineEmits<{

@@ -19,19 +19,17 @@
 
     <div class="source-body">
       <div class="source-meta">
-        <span v-if="source.last_sync" class="meta-item">
-          <Clock :size="14" />
-          {{ lastSyncLabel }}: {{ formattedDate(source.last_sync) }}
+        <span v-if="source.description" class="meta-item">
+          {{ source.description }}
         </span>
-        <span v-else class="meta-item">
-          <Clock :size="14" />
-          {{ neverSyncedLabel }}
+        <span v-if="source.tags && source.tags.length > 0" class="meta-item">
+          {{ source.tags.join(', ') }}
         </span>
       </div>
     </div>
 
     <div class="source-footer">
-      <button v-if="source.source_type === 'local'" class="action-btn" @click="$emit('sync', source.id)">
+      <button v-if="hasSync" class="action-btn" @click="$emit('sync', source.id)">
         <RefreshCw :size="16" />
         {{ syncLabel }}
       </button>
@@ -54,31 +52,32 @@ import {
   Database,
   Globe,
   Folder,
-  Clock,
+  Search,
   Upload,
   Trash,
   RefreshCw
 } from 'lucide-vue-next'
-import { formatDate } from '@/utils/time'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 
-interface KnowledgeSource {
+interface SourceConfig {
   id: string
   name: string
   source_type: string
   enabled: boolean
-  last_sync: string | null
+  priority: number
+  description: string
+  tags: string[]
   config?: Record<string, any>
 }
 
 interface Props {
-  source: KnowledgeSource
+  source: SourceConfig
 }
 
 const props = defineProps<Props>()
 
 defineEmits<{
-  toggle: [source: KnowledgeSource]
+  toggle: [source: SourceConfig]
   upload: [id: string]
   delete: [id: string]
   sync: [id: string]
@@ -86,18 +85,18 @@ defineEmits<{
 
 const { t } = useI18n()
 
-const lastSyncLabel = computed(() => t('knowledgeSearch.lastSync'))
-const neverSyncedLabel = computed(() => t('knowledgeSearch.neverSynced'))
 const uploadLabel = computed(() => t('knowledgeSearch.uploadDocument'))
 const syncLabel = computed(() => t('knowledgeSearch.syncSource'))
+
+const hasSync = computed(() => {
+  return ['local', 'database', 'web_search'].includes(props.source.source_type)
+})
 
 const getIcon = (type: string) => {
   const icons: Record<string, any> = {
     local: Folder,
-    wiki: Globe,
     database: Database,
-    api: Globe,
-    web: Globe
+    web_search: Search,
   }
   return icons[type] || FileText
 }
@@ -105,16 +104,10 @@ const getIcon = (type: string) => {
 const getTypeLabel = (type: string) => {
   const labels: Record<string, string> = {
     local: t('knowledgeSearch.typeLocal'),
-    wiki: t('knowledgeSearch.typeWiki'),
     database: t('knowledgeSearch.typeDatabase'),
-    api: t('knowledgeSearch.typeApi'),
-    web: t('knowledgeSearch.typeWeb')
+    web_search: t('knowledgeSearch.typeWebSearch'),
   }
   return labels[type] || type
-}
-
-const formattedDate = (dateStr: string) => {
-  return formatDate(dateStr)
 }
 </script>
 

@@ -14,6 +14,17 @@ from backend.modules.agent.todo_toolkit import TodoToolkit, TodoStatus, format_t
 class AgentLoop:
     """Agent 主循环类 - 处理消息、调用 LLM、执行工具、生成响应"""
 
+    @staticmethod
+    async def _emit_plugin_event(event: str, context: dict = None):
+        """发射插件事件（非侵入式，失败不影响主流程）"""
+        try:
+            from backend.modules.plugins import get_plugin_manager
+            manager = get_plugin_manager()
+            if manager and manager.is_enabled("superworkers"):
+                await manager.emit_event(event, context or {})
+        except Exception as e:
+            logger.debug(f"Plugin event {event} failed (non-critical): {e}")
+
     def __init__(
         self,
         provider,
@@ -189,6 +200,15 @@ class AgentLoop:
             self._resolve_execution_runtime(model_override)
         )
 
+        # 发射 before_process 事件（轨迹记录等）
+        await self._emit_plugin_event("before_process", {
+            "session_id": session_id,
+            "message": message,
+            "channel": channel,
+            "chat_id": chat_id,
+            "model": runtime_model,
+        })
+
         # 设置工具注册表的会话ID（用于审计日志）和渠道信息
         if self.tools:
             self.tools.set_session_id(session_id)
@@ -346,7 +366,14 @@ class AgentLoop:
                             f"Executing tool {total_tool_calls}/{runtime_max_iterations}: "
                             f"{tool_name} with args: {json.dumps(tool_args, ensure_ascii=False)}"
                         )
-                        
+
+                        # 发射 tool_called 事件（轨迹记录等）
+                        await self._emit_plugin_event("tool_called", {
+                            "session_id": session_id,
+                            "tool_name": tool_name,
+                            "arguments": tool_args,
+                        })
+
                         # 发送工具调用开始通知
                         try:
                             from backend.ws.tool_notifications import notify_tool_execution
@@ -373,6 +400,14 @@ class AgentLoop:
                                 else:
                                     result = await self.execute_tool(tool_name, tool_args)
                                 logger.debug(f"Tool {tool_name} executed successfully")
+
+                                # 发射 tool_result 事件（轨迹记录等）
+                                await self._emit_plugin_event("tool_result", {
+                                    "session_id": session_id,
+                                    "tool_name": tool_name,
+                                    "result": str(result)[:2000],
+                                    "success": True,
+                                })
                                 break
                                 
                             except Exception as e:
@@ -472,6 +507,14 @@ class AgentLoop:
                             # 所有重试都失败了
                             error_msg = f"Tool execution failed after {self.max_retries} attempts: {str(last_error)}"
                             logger.error(f"Tool {tool_name} failed permanently: {error_msg}")
+
+                            # 发射 tool_result 事件（失败）
+                            await self._emit_plugin_event("tool_result", {
+                                "session_id": session_id,
+                                "tool_name": tool_name,
+                                "result": error_msg,
+                                "success": False,
+                            })
                             
                             # 记录工具调用对话（失败）
                             try:
@@ -558,7 +601,18 @@ class AgentLoop:
                 
         except Exception as e:
             logger.exception(f"Error in agent loop: {e}")
+            # 发射 after_process 事件（即使出错也记录轨迹）
+            await self._emit_plugin_event("after_process", {
+                "session_id": session_id,
+                "outcome": "error",
+            })
             raise
+
+        # 发射 after_process 事件（正常完成）
+        await self._emit_plugin_event("after_process", {
+            "session_id": session_id,
+            "outcome": "success",
+        })
 
     async def execute_tool(
         self,

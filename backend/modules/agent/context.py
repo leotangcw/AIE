@@ -235,7 +235,14 @@ class ContextBuilder:
 - 复杂任务用 todo 拆分步骤（如：1. 生成视频 2. 生成音乐 3. 合成）
 - 耗时步骤用 run_background 后台执行
 - 步骤完成后用 todo_complete 标记
-- 用户中断时待办列表自动保存进度，可修改后继续执行"""
+- 用户中断时待办列表自动保存进度，可修改后继续执行
+
+## 企业知识工作流（SuperWorkers）
+当面临企业办公场景（查询内部数据、处理业务任务、需要专业知识）时，优先使用 SuperWorkers 工作体系获取知识支持：
+1. 先检查本地技能列表，看是否有匹配的技能可用
+2. 使用 knowledge_retrieve 工具检索企业知识库
+3. 整理参考资料后再执行任务
+了解完整工作流: 使用插件中 SuperWorkers 的 using-superworkers 技能"""
         
         return identity
 

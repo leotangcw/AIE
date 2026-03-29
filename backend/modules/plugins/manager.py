@@ -84,16 +84,30 @@ class PluginManager:
         if plugin_config:
             plugin.set_options(plugin_config.get("options", {}))
 
-        # 尝试启用插件（如果配置中启用）
-        if plugin_config.get("enabled", plugin.enabled_by_default):
-            import asyncio
-
-            try:
-                asyncio.get_event_loop().run_until_complete(self.enable_plugin(plugin.name))
-            except RuntimeError:
-                pass
-
+        # 注意：插件注册后不会自动启用，需要调用 async_register() 或在异步上下文中手动调用 enable_plugin()
         logger.info(f"Registered plugin: {plugin.name} v{plugin.version}")
+
+    async def async_register(self, plugin: Plugin) -> None:
+        """
+        异步注册插件（含自动启用）
+
+        在异步上下文中使用，注册插件并根据配置自动启用。
+
+        Args:
+            plugin: 插件实例
+
+        Raises:
+            ValueError: 插件已存在
+        """
+        self.register(plugin)
+
+        # 尝试启用插件（如果配置中启用）
+        plugin_config = self.get_plugin_config(plugin.name)
+        if plugin_config.get("enabled", plugin.enabled_by_default):
+            try:
+                await self.enable_plugin(plugin.name)
+            except Exception as e:
+                logger.warning(f"Failed to auto-enable plugin '{plugin.name}': {e}")
 
     async def load_plugin(self, plugin_name: str) -> bool:
         """
@@ -122,7 +136,7 @@ class PluginManager:
                 return False
 
             plugin = plugin_class(manager=self)
-            self.register(plugin)
+            await self.async_register(plugin)
 
             await plugin.on_load()
             return True

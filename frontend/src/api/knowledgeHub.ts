@@ -264,6 +264,25 @@ export const knowledgeHubApi = {
     const response = await apiClient.get('/knowledge_hub/stats')
     return unwrapResponse<KnowledgeStats>(response)
   },
+
+  // 更新知识源
+  updateSource: async (sourceId: string, updates: Partial<Pick<SourceConfig, 'enabled' | 'name' | 'priority' | 'description'>>): Promise<void> => {
+    await apiClient.put(`/knowledge_hub/sources/${sourceId}`, updates)
+  },
+
+  // 上传文档到知识源
+  addDocument: async (sourceId: string, file: File): Promise<{ chunks_added: number }> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await apiClient.postForm(`/knowledge_hub/sources/${sourceId}/documents`, formData)
+    return unwrapResponse<{ chunks_added: number }>(response)
+  },
+
+  // 浏览服务器目录
+  browseDirectory: async (path: string): Promise<Array<{name: string, path: string, is_dir: boolean}>> => {
+    const response = await apiClient.get('/knowledge_hub/browse-directory', { params: { path } })
+    return unwrapResponse(response)
+  },
 }
 
 export default knowledgeHubApi
